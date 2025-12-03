@@ -34,7 +34,7 @@ from web_portal.utils.helpers import generate_secure_password, validate_email_fo
 from web_portal.utils.notify_service import send_welcome_email_direct_smtp
 from web_portal.validation.superadmin_validation import add_serial_numbers
 
-
+from web_portal.models import Superadminlogindetails
 import random
 import string
 import re

@@ -1,77 +1,78 @@
+
+
 import qrcode
 from io import BytesIO
 from django.core.mail import EmailMultiAlternatives
 from django.utils.html import strip_tags
 from django.conf import settings
+from email.mime.image import MIMEImage
+import pyotp
 
 
-def send_qr_code_via_smtp(to_email, username, qr_secret):
-    try:
-        qr = qrcode.QRCode(version=1, box_size=10, border=4)
-        qr.add_data(f"otpauth://totp/Superadmin Portal:{username}?secret={qr_secret}&issuer=Superadmin Portal")
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        qr_image_data = buffer.getvalue()
-        buffer.close()
+def send_qr_code_via_smtp(to_email, username, qr_secret=None):
+    if qr_secret is None:
+        qr_secret = pyotp.random_base32()
 
-        subject = "Superadmin Portal – Set Up Two-Factor Authentication (2FA)"
+    missing_padding = len(qr_secret) % 8
+    if missing_padding:
+        qr_secret += '=' * (8 - missing_padding)
 
-        html_content = f"""
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background: #f9f9f9; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
-            <h2 style="color: #1a5fb4; text-align:center; margin-bottom:10px;">Secure Your Account</h2>
-            <p style="text-align:center; color:#555; margin-bottom:30px;">Two-Factor Authentication (2FA) Setup</p>
+    totp_uri = f"otpauth://totp/Superadmin%20Portal:{username}?secret={qr_secret}&issuer=Superadmin%20Portal"
 
-            <div style="background:white; padding:35px; border-radius:14px; text-align:center;">
-                <p style="font-size:17px; color:#333; margin-bottom:30px;">
-                    Hello <strong>{username}</strong>,<br><br>
-                    Please scan the QR code below with <strong>Google Authenticator</strong> or Authy app:
-                </p>
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(totp_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
 
-                <div style="margin:40px 0; padding:20px; background:#f8fbff; border-radius:12px; border:3px solid #1a5fb4;">
-                    <img src="cid:qr_code_inline" alt="2FA QR Code" style="width:230px; height:230px;" />
-                </div>
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    qr_image_data = buffer.getvalue()
+    buffer.close()
 
-                <p style="color:#666; margin:25px 0 10px;">Can't scan the QR code?</p>
-                <div style="background:#eef5ff; padding:18px; border-radius:10px; font-family:monospace; font-size:18px; letter-spacing:2px; border-left:6px solid #1a5fb4;">
-                    <strong>{qr_secret}</strong>
-                </div>
+    subject = "Superadmin Portal – Set Up Two-Factor Authentication (2FA)"
 
-                <div style="margin-top:30px; padding:18px; background:#fff8e1; border-radius:10px; border-left:5px solid #ff9800;">
-                    <p style="margin:0; color:#d32f2f; font-weight:bold; font-size:15px;">
-                        Keep this QR code and secret key private and secure.
-                    </p>
-                </div>
+    html_content = f"""
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background: #f9f9f9; border-radius: 16px;">
+        <h2 style="color: #1a5fb4; text-align:center;">Secure Your Account</h2>
+        <p style="text-align:center; color:#555;">Two-Factor Authentication (2FA) Setup</p>
+
+        <div style="background:white; padding:35px; border-radius:14px; text-align:center;">
+            <p>Hello <strong>{username}</strong>,<br><br>
+               Scan the QR code below with <strong>Google Authenticator</strong> or Authy:
+            </p>
+
+            <div style="margin:40px 0; padding:20px; background:#f8fbff; border-radius:12px;">
+                <img src="cid:qr_code_inline" alt="2FA QR Code" style="width:240px; height:240px;" />
             </div>
 
-            <p style="text-align:center; color:#888; font-size:13px; margin-top:30px;">
-                © 2025 Superadmin Portal – Enterprise Grade Security
-            </p>
+            <p>Can't scan? Enter this key manually:</p>
+            <div style="background:#eef5ff; padding:18px; border-radius:10px; font-family:monospace; font-size:20px; letter-spacing:3px; word-break:break-all;">
+                <strong>{qr_secret}</strong>
+            </div>
+
+            <div style="margin-top:25px; padding:15px; background:#fff3cd; border-radius:8px; border-left:5px solid #ff9800;">
+                <strong>Keep this secret safe and private!</strong>
+            </div>
         </div>
-        """
+    </div>
+    """
 
-        email = EmailMultiAlternatives(
-            subject=subject,
-            body=strip_tags(html_content),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[to_email]
-        )
-        email.attach_alternative(html_content, "text/html")
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=strip_tags(html_content),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[to_email]
+    )
+    email.attach_alternative(html_content, "text/html")
+    email.attach("2FA_QR_Code.png", qr_image_data, "image/png")
 
-        email.attach("Qr_code.png", qr_image_data, "image/png")
+    inline_img = MIMEImage(qr_image_data)
+    inline_img.add_header('Content-ID', '<qr_code_inline>')
+    inline_img.add_header('Content-Disposition', 'inline', filename='qr_code_inline.png')
+    email.attach(inline_img)
 
-        from email.mime.image import MIMEImage
-        inline_image = MIMEImage(qr_image_data)
-        inline_image.add_header('Content-ID', '<qr_code_inline>')
-        inline_image.add_header('Content-Disposition', 'inline', filename='qr_code_inline')
-        email.attach(inline_image)
-
-        email.send(fail_silently=False)
-    
-    except Exception as e:
-        raise
+    email.send(fail_silently=False)
+    return qr_secret
 
 
 def send_welcome_email_direct_smtp(to_email, full_name, username, password):

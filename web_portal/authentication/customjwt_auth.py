@@ -1,12 +1,17 @@
-from ..views import*
+import jwt
+from datetime import timedelta
+from rest_framework_simplejwt.tokens import RefreshToken          
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework import exceptions
+from web_portal.models import AdminAccount  
 
 
 def generate_jwt_token(user, expiry_minutes=None):
-    refresh = RefreshToken.for_user(user)
+    refresh = RefreshToken.for_user(user)       
     refresh["role"] = "SUPERADMIN"
     refresh["username"] = user.username
     refresh["user_id"] = user.id
+    
     if expiry_minutes:
         refresh.access_token.set_exp(lifetime=timedelta(minutes=expiry_minutes))
 
@@ -42,7 +47,9 @@ class SecureJWTAuthentication(JWTAuthentication):
             if not user_id:
                 raise exceptions.AuthenticationFailed("Token missing user_id")
 
-            user = AdminAccount.objects.only("id", "username", "is_deleted").get(id=user_id, is_deleted=False)
+            user = AdminAccount.objects.only("id", "username", "is_deleted").get(
+                id=user_id, is_deleted=False
+            )
             return (user, validated_token)
 
         except jwt.ExpiredSignatureError:
@@ -51,5 +58,5 @@ class SecureJWTAuthentication(JWTAuthentication):
             raise exceptions.AuthenticationFailed("Invalid token")
         except AdminAccount.DoesNotExist:
             raise exceptions.AuthenticationFailed("User not found or deactivated")
-        except Exception as e:
+        except Exception:
             raise exceptions.AuthenticationFailed("Authentication failed")
