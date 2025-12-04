@@ -1,13 +1,31 @@
 from django.urls import path
-from web_portal.superadmincreation.superadmin_manage import SuperAdminManage
-from .APIs.login_flow.superadmin_login import (AdminSignInEndpoint,UpdateInitialPasswordEndpoint,TOTPVerificationEndpoint,ForgotPasswordRequestEndpoint,ConfirmResetCodeEndpoint,FinalizePasswordResetEndpoint,)
+from web_portal.APIs.superadmincreation.superadmin_manage import *
+from web_portal.APIs.login_flow.superadmin_login import *
+from web_portal.APIs.banners.banner import *
+from web_portal.APIs.about.aboutus import*
+from web_portal.APIs.lattest_news.lattestnewshub import*
+from web_portal.APIs.contactsupport.customer_contactsupport import*
 
 urlpatterns = [
-    path('', SuperAdminManage.as_view(), name='manage-superadmins'),
-    path('login/', AdminSignInEndpoint.as_view(), name='admin-login'),
-    path('change-password/', UpdateInitialPasswordEndpoint.as_view(), name='change-initial-password'),
-    path('verify-otp/', TOTPVerificationEndpoint.as_view(), name='verify-otp'),
-    path('forgot-password/', ForgotPasswordRequestEndpoint.as_view(), name='forgot-password'),
-    path('verify-reset-code/', ConfirmResetCodeEndpoint.as_view(), name='verify-reset-code'),
-    path('reset-password/', FinalizePasswordResetEndpoint.as_view(), name='reset-password'),
+    path('', SuperAdminManageView.as_view()),
+    path('login/', AdminSignInView.as_view()),
+    path('change-password/', UpdateInitialPasswordView.as_view()),
+    path('verify-otp/', TOTPVerificationView.as_view()),
+    path('forgot-password/', ForgotPasswordRequestView.as_view()),
+    path('verify-reset-code/', ConfirmResetCodeView.as_view()),
+    path('reset-password/', FinalizePasswordResetView.as_view()),
+    
+    #adminbanner
+    path('admin-banner/',AdminBannerView.as_view()),
+    
+    #aboutus
+    path('about-us/',AboutusView.as_view()),
+    
+    #Latestnewshubview
+    path('latest-news-hub/',LatestnewshubView.as_view()),
+    path('home-abous-us-page/',PublicaboutusView.as_view()),
+    
+    #contactsupport
+    path('customer-contact-support/',ContactSupportView.as_view()),
+    path('add-contact/',AddContactSupportView.as_view()),
 ]

@@ -1,10 +1,7 @@
 from ...views import*
-from web_portal.utils.helpers import secure_random_string 
+from web_portal.APIs.utils.helpers import secure_random_string 
 
-logger = logging.getLogger(__name__)
-
-
-class AdminSignInEndpoint(APIView):
+class AdminSignInView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -20,7 +17,6 @@ class AdminSignInEndpoint(APIView):
 
             user = authenticate(request, username=username, password=password)
             if not user:
-                logger.warning(f"Failed login attempt: {username}")
                 return Response({
                     'status': 'fail',
                     'message': 'Invalid username or password'
@@ -53,7 +49,6 @@ class AdminSignInEndpoint(APIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.exception(f"Login failed for {username or 'unknown'}: {e}")
             return Response({
                 'status': 'error',
                 'message': 'Internal server error'
@@ -69,7 +64,6 @@ class AdminSignInEndpoint(APIView):
             admin.google_auth_key = totp_secret
             admin.save(update_fields=['google_auth_key'])
 
-            logger.info(f"2FA QR code sent to {admin.email}")
             return Response({
                 'status': 'success',
                 'message': 'QR code sent to your email. Please scan it to complete 2FA setup.',
@@ -78,14 +72,13 @@ class AdminSignInEndpoint(APIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.exception(f"Failed to send 2FA QR code to {admin.email}: {e}")
             return Response({
                 'status': 'error',
                 'message': 'Failed to send 2FA setup email. Please try again.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class UpdateInitialPasswordEndpoint(APIView):
+class UpdateInitialPasswordView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -139,16 +132,15 @@ class UpdateInitialPasswordEndpoint(APIView):
                 'message': 'Invalid username'
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.exception("UpdateInitialPassword failed")
             return Response({
                 'status': 'error',
                 'message': 'Internal server error'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class TOTPVerificationEndpoint(APIView):
+class TOTPVerificationView(APIView):
     authentication_classes = [SecureJWTAuthentication]
-    permission_classes = [SuperAdminOnlyPermission]
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         try:
@@ -181,7 +173,6 @@ class TOTPVerificationEndpoint(APIView):
                     browser_name=str(browser)[:200]
                 )
 
-                logger.info(f"2FA verified for user: {user.username}")
                 return Response({
                     'status': 'success',
                     'message': '2FA successful! Welcome back.',
@@ -195,14 +186,13 @@ class TOTPVerificationEndpoint(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            logger.exception("TOTP verification failed")
             return Response({
                 'status': 'error',
                 'message': 'Internal server error'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ForgotPasswordRequestEndpoint(APIView):
+class ForgotPasswordRequestView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -237,7 +227,6 @@ class ForgotPasswordRequestEndpoint(APIView):
                 request_data=request.data
             )
 
-            logger.info(f"Password reset requested for: {email}")
             return Response({
                 'status': 'success',
                 'message': 'Verification code sent to your email'
@@ -249,14 +238,13 @@ class ForgotPasswordRequestEndpoint(APIView):
                 'message': 'This email is not registered.'
             }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.exception("Forgot password request failed")
             return Response({
                 'status': 'error',
                 'message': 'Internal server error'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ConfirmResetCodeEndpoint(APIView):
+class ConfirmResetCodeView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -315,14 +303,13 @@ class ConfirmResetCodeEndpoint(APIView):
                 'message': 'User not found'
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.exception("Confirm reset code failed")
             return Response({
                 'status': 'error',
                 'message': 'Internal server error'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class FinalizePasswordResetEndpoint(APIView):
+class FinalizePasswordResetView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -358,7 +345,6 @@ class FinalizePasswordResetEndpoint(APIView):
                 request_data={"new_password": "*****"}
             )
 
-            logger.info(f"Password reset completed for user: {admin.username}")
             return Response({
                 'status': 'success',
                 'message': 'Password changed successfully. You can now login.'
@@ -380,7 +366,6 @@ class FinalizePasswordResetEndpoint(APIView):
                 'message': 'User not found'
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.exception("Finalize password reset failed")
             return Response({
                 'status': 'error',
                 'message': 'Internal server error'

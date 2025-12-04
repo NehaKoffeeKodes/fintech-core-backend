@@ -6,6 +6,7 @@ from rest_framework import exceptions
 from web_portal.models import AdminAccount  
 
 
+
 def generate_jwt_token(user, expiry_minutes=None):
     refresh = RefreshToken.for_user(user)       
     refresh["role"] = "SUPERADMIN"
@@ -18,16 +19,6 @@ def generate_jwt_token(user, expiry_minutes=None):
     return str(refresh.access_token)
 
 
-class SuperAdminOnlyPermission:
-    def has_permission(self, request, view):
-        user = request.user
-        return (
-            user
-            and user.is_authenticated
-            and isinstance(user, AdminAccount)
-            and getattr(user, "has_changed_initial_password", False)
-            and not getattr(user, "is_deleted", False)
-        )
 
 
 class SecureJWTAuthentication(JWTAuthentication):

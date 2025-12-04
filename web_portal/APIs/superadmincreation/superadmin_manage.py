@@ -1,7 +1,8 @@
-from ..views import*
+from ...views import*
+from web_portal.APIs.utils.helpers import *
 
 
-class SuperAdminManage(APIView):
+class SuperAdminManageView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin]
 
@@ -117,7 +118,7 @@ class SuperAdminManage(APIView):
                     "joined_on": admin.date_joined.strftime("%b %d, %Y")
                 })
 
-            paginated_data = add_serial_numbers(admin_list, page, size)
+            paginated_data = add_serial_number(admin_list, page, size)
 
             return Response({
                 "status": "success",

@@ -1,5 +1,3 @@
-
-
 import qrcode
 from io import BytesIO
 from django.core.mail import EmailMultiAlternatives

@@ -1,6 +1,6 @@
-from ..views import *
+from ...views import *
 import random
-import string
+import string,re
 
 def secure_random_string(length=6, chars=string.digits):
     return ''.join(random.choice(chars) for _ in range(length))
