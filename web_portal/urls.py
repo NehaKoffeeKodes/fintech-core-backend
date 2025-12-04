@@ -1,6 +1,6 @@
 from django.urls import path
 from web_portal.APIs.superadmincreation.superadmin_manage import *
-from web_portal.APIs.login_flow.superadmin_login import *
+from web_portal.APIs.superadmin_login_details.superadmin_login import *
 from web_portal.APIs.banners.banner import *
 from web_portal.APIs.about.aboutus import*
 from web_portal.APIs.lattest_news.lattestnewshub import*
