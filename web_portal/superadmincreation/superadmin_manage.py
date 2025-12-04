@@ -6,103 +6,105 @@ class SuperAdminManage(APIView):
     permission_classes = [IsSuperAdmin]
 
     def post(self, request):
-        try:
-            if request.data.get('first_name') and request.data.get('last_name'):
-                return self._create_admin(request)
-            elif request.data.get('page_number') or request.data.get('page_size'):
-                return self._list_admins(request)
-            else:
-                return Response({
-                    'status': 'fail',
-                    'message': 'Invalid request. Provide either admin creation data or pagination parameters.'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception as e:
+        action = self._detect_action(request.data)
+        if action == "create":
+            return self._handle_create(request)
+        elif action == "list":
+            return self._handle_list(request)
+        else:
             return Response({
-                'status': 'error',
-                'message': 'Internal server error occurred'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                "status": "fail",
+                "message": "Please provide valid data for create or list operation"
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-    def _create_admin(self, request):
-        data = request.data
-        required_fields = ['first_name', 'last_name', 'user_name', 'email', 'contact_number']
+    def put(self, request):
+        return self._handle_update(request)
 
-        for field in required_fields:
-            if not data.get(field):
-                return Response({
-                    'status': 'fail',
-                    'message': f'{field.replace("_", " ").title()} is required'
-                }, status=status.HTTP_400_BAD_REQUEST)
+    def delete(self, request):
+        return self._handle_delete(request)
 
-        email = data['email'].strip().lower()
-        username = data['user_name'].strip()
-        contact = data['contact_number'].strip()
+    # ────────────────────── Helper Methods ──────────────────────
 
-        if not validate_email_format(email):
-            return Response({'status': 'fail', 'message': 'Invalid email format'}, status=status.HTTP_400_BAD_REQUEST)
-        if not validate_phone_format(contact):
-            return Response({'status': 'fail', 'message': 'Invalid phone number format'}, status=status.HTTP_400_BAD_REQUEST)
+    def _detect_action(self, data):
+        if data.get("first_name") and data.get("last_name"):
+            return "create"
+        if "page_number" in data or "page_size" in data:
+            return "list"
+        return None
 
-        if AdminAccount.objects.filter(email=email, is_deleted=False).exists():
-            return Response({'status': 'fail', 'message': 'Email already registered'}, status=status.HTTP_409_CONFLICT)
-        if AdminAccount.objects.filter(username=username, is_deleted=False).exists():
-            return Response({'status': 'fail', 'message': 'Username already taken'}, status=status.HTTP_409_CONFLICT)
-        if AdminAccount.objects.filter(contact_number=contact, is_deleted=False).exists():
-            return Response({'status': 'fail', 'message': 'Phone number already in use'}, status=status.HTTP_409_CONFLICT)
-
-        temp_password = generate_secure_password(12)
-
+    def _handle_create(self, request):
         try:
+            payload = request.data
+
+            # Required fields validation
+            fields_required = ["first_name", "last_name", "user_name", "email", "contact_number"]
+            for field in fields_required:
+                if not payload.get(field):
+                    return Response({
+                        "status": "fail",
+                        "message": f"{field.replace('_', ' ').title()} is mandatory"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            email = payload["email"].strip().lower()
+            username = payload["user_name"].strip()
+            phone = payload["contact_number"].strip()
+
+            # Format validation
+            if not validate_email_format(email):
+                return Response({"status": "fail", "message": "Please enter a valid email"}, status=400)
+            if not validate_phone_format(phone):
+                return Response({"status": "fail", "message": "Please enter a valid phone number"}, status=400)
+
+            # Duplicate check
+            if AdminAccount.objects.filter(email=email, is_deleted=False).exists():
+                return Response({"status": "fail", "message": "This email is already registered"}, status=409)
+            if AdminAccount.objects.filter(username=username, is_deleted=False).exists():
+                return Response({"status": "fail", "message": "This username is already taken"}, status=409)
+            if AdminAccount.objects.filter(contact_number=phone, is_deleted=False).exists():
+                return Response({"status": "fail", "message": "This phone number is already in use"}, status=409)
+
+            # Create admin
+            temp_pass = generate_secure_password(12)
             new_admin = AdminAccount.objects.create_superuser(
                 username=username,
                 email=email,
-                password=temp_password,
-                first_name=data['first_name'].strip(),
-                last_name=data['last_name'].strip(),
-                contact_number=contact,
-                alternate_contact_number=data.get('alternate_contact_number', '').strip(),
-                notes=data.get('notes', '').strip()
+                password=temp_pass,
+                first_name=payload["first_name"].strip(),
+                last_name=payload["last_name"].strip(),
+                contact_number=phone,
             )
             new_admin.has_changed_initial_password = False
             new_admin.save()
 
+            # Send welcome email
             send_welcome_email_direct_smtp(
                 to_email=new_admin.email,
                 full_name=f"{new_admin.first_name} {new_admin.last_name}",
                 username=new_admin.username,
-                password=temp_password
+                password=temp_pass
             )
 
             return Response({
-                'status': 'success',
-                'message': 'SuperAdmin created successfully. Login credentials sent to email.'
+                "status": "success",
+                "message": "SuperAdmin account created successfully. Login details sent on email."
             }, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': 'Failed to create admin account'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as exc:
+            return Response({"status": "error", "message": "Something went wrong"}, status=500)
 
-    def _list_admins(self, request):
+    def _handle_list(self, request):
         try:
-            page = int(request.data.get('page_number', 1))
-            size = int(request.data.get('page_size', 10))
-            search = request.data.get('search', '').strip()
+            page = max(1, int(request.data.get("page_number", 1)))
+            size = min(100, max(1, int(request.data.get("page_size", 10))))
+            search = request.data.get("search", "").strip()
 
-            if page < 1 or size < 1 or size > 100:
-                return Response({
-                    'status': 'fail',
-                    'message': 'Invalid pagination parameters'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            queryset = AdminAccount.objects.filter(
+            base_qs = AdminAccount.objects.filter(
                 is_superuser=True,
                 is_deleted=False
-            ).order_by('-date_joined')
+            ).order_by("-date_joined")
 
             if search:
-                queryset = queryset.filter(
+                base_qs = base_qs.filter(
                     Q(first_name__icontains=search) |
                     Q(last_name__icontains=search) |
                     Q(username__icontains=search) |
@@ -110,116 +112,98 @@ class SuperAdminManage(APIView):
                     Q(contact_number__icontains=search)
                 )
 
-            admins_data = [
-                {
-                    'id': admin.id,
-                    'first_name': admin.first_name or '',
-                    'last_name': admin.last_name or '',
-                    'user_name': admin.username,
-                    'email': admin.email,
-                    'contact_number': admin.contact_number or '',
-                    'alternate_contact_number': admin.alternate_contact_number or '',
-                    'notes': admin.notes or '',
-                    'has_2fa': bool(admin.google_auth_key),
-                    'created_at': admin.date_joined.strftime('%Y-%m-%d %H:%M:%S')
-                }
-                for admin in queryset
-            ]
+            admin_list = []
+            for admin in base_qs:
+                admin_list.append({
+                    "id": admin.id,
+                    "full_name": f"{admin.first_name or ''} {admin.last_name or ''}".strip(),
+                    "username": admin.username,
+                    "email": admin.email,
+                    "phone": admin.contact_number or "",
+                    "has_2fa_enabled": bool(admin.google_auth_key),
+                    "joined_on": admin.date_joined.strftime("%b %d, %Y")
+                })
 
-            paginated = add_serial_numbers(admins_data, page, size)
+            paginated_data = add_serial_numbers(admin_list, page, size)
 
             return Response({
-                'status': 'success',
-                'message': 'Admins retrieved successfully',
-                'data': paginated
+                "status": "success",
+                "message": "SuperAdmins fetched successfully",
+                "data": paginated_data
             }, status=status.HTTP_200_OK)
 
         except ValueError:
-            return Response({
-                'status': 'fail',
-                'message': 'Page number and page size must be valid integers'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': 'Failed to fetch admin list'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"status": "fail", "message": "Invalid page or size value"}, status=400)
+        except Exception as exc:
+            return Response({"status": "error", "message": "Failed to load data"}, status=500)
 
-    def put(self, request):
-        admin_id = request.data.get('admin_id')
-        if not admin_id:
-            return Response({
-                'status': 'fail',
-                'message': 'admin_id is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
+    def _handle_update(self, request):
         try:
+            admin_id = request.data.get("admin_id")
+            if not admin_id:
+                return Response({"status": "fail", "message": "admin_id is required"}, status=400)
+
             admin = AdminAccount.objects.get(id=admin_id, is_superuser=True, is_deleted=False)
 
-            update_fields = [
-                'first_name', 'last_name', 'username',
-                'email', 'contact_number', 'alternate_contact_number', 'notes'
-            ]
+            if request.data.get("email"):
+                new_email = request.data["email"].strip().lower()
+                if new_email != admin.email and AdminAccount.objects.filter(email=new_email, is_deleted=False).exists():
+                    return Response({"status": "fail", "message": "Email already in use"}, status=409)
 
-            updated = False
-            for field in update_fields:
-                value = request.data.get(field)
+            if request.data.get("user_name"):
+                new_username = request.data["user_name"].strip()
+                if new_username != admin.username and AdminAccount.objects.filter(username=new_username, is_deleted=False).exists():
+                    return Response({"status": "fail", "message": "Username already taken"}, status=409)
+
+            if request.data.get("contact_number"):
+                new_phone = request.data["contact_number"].strip()
+                if new_phone != admin.contact_number and AdminAccount.objects.filter(contact_number=new_phone, is_deleted=False).exists():
+                    return Response({"status": "fail", "message": "Phone number already in use"}, status=409)
+
+            update_map = {
+                "first_name": request.data.get("first_name"),
+                "last_name": request.data.get("last_name"),
+                "user_name": request.data.get("user_name"),
+                "email": request.data.get("email"),
+                "contact_number": request.data.get("contact_number"),
+            }
+
+            for field, value in update_map.items():
                 if value is not None:
-                    value = str(value).strip()
-                    if getattr(admin, field) != value:
-                        setattr(admin, field, value)
-                        updated = True
+                    setattr(admin, field, str(value).strip())
 
-            if updated:
-                admin.save()
+            admin.save()
+
             return Response({
-                'status': 'success',
-                'message': 'Profile updated successfully'
-            }, status=status.HTTP_200_OK)
+                "status": "success",
+                "message": "SuperAdmin profile updated successfully"
+            }, status=200)
 
         except AdminAccount.DoesNotExist:
-            return Response({
-                'status': 'fail',
-                'message': 'Admin not found or access denied'
-            }, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': 'Update failed'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"status": "fail", "message": "SuperAdmin not found"}, status=404)
+        except Exception as exc:
+            return Response({"status": "error", "message": "Update failed"}, status=500)
 
-    def delete(self, request):
-        admin_id = request.data.get('admin_id')
-        if not admin_id:
-            return Response({
-                'status': 'fail',
-                'message': 'admin_id is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        if str(admin_id) == str(request.user.id):
-            return Response({
-                'status': 'fail',
-                'message': 'You cannot delete your own account'
-            }, status=status.HTTP_403_FORBIDDEN)
-
+    def _handle_delete(self, request):
         try:
+            admin_id = request.data.get("admin_id")
+            if not admin_id:
+                return Response({"status": "fail", "message": "admin_id is required"}, status=400)
+
+            if str(admin_id) == str(request.user.id):
+                return Response({"status": "fail", "message": "You cannot delete your own account"}, status=403)
+
             admin = AdminAccount.objects.get(id=admin_id, is_superuser=True, is_deleted=False)
             admin.is_deleted = True
             admin.is_active = False
             admin.save()
 
             return Response({
-                'status': 'success',
-                'message': 'Admin account removed successfully'
-            }, status=status.HTTP_200_OK)
+                "status": "success",
+                "message": "SuperAdmin account removed successfully"
+            }, status=200)
 
         except AdminAccount.DoesNotExist:
-            return Response({
-                'status': 'fail',
-                'message': 'Admin not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': 'Deletion failed'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"status": "fail", "message": "SuperAdmin not found"}, status=404)
+        except Exception as exc:
+            return Response({"status": "error", "message": "Deletion failed"}, status=500)

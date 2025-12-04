@@ -1,4 +1,5 @@
 from ...views import*
+from web_portal.utils.helpers import secure_random_string 
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,6 @@ class AdminSignInEndpoint(APIView):
                 username=admin.username
             )
 
-            # Save secret in database
             admin.google_auth_key = totp_secret
             admin.save(update_fields=['google_auth_key'])
 

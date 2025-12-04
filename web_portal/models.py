@@ -8,6 +8,7 @@ class AdminAccount(AbstractUser):
     email = models.EmailField(unique=True, db_index=True)
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
+    contact_number = models.CharField(max_length=15, blank=True, null=True, unique=True)
     google_auth_key = models.CharField(max_length=100, blank=True, null=True)
     verify_code = models.CharField(max_length=255, blank=True, null=True)
     verify_code_expire_at = models.DateTimeField(null=True, blank=True)
