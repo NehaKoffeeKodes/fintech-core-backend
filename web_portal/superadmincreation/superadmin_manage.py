@@ -23,7 +23,6 @@ class SuperAdminManage(APIView):
     def delete(self, request):
         return self._handle_delete(request)
 
-    # ────────────────────── Helper Methods ──────────────────────
 
     def _detect_action(self, data):
         if data.get("first_name") and data.get("last_name"):
@@ -35,8 +34,6 @@ class SuperAdminManage(APIView):
     def _handle_create(self, request):
         try:
             payload = request.data
-
-            # Required fields validation
             fields_required = ["first_name", "last_name", "user_name", "email", "contact_number"]
             for field in fields_required:
                 if not payload.get(field):
@@ -49,13 +46,11 @@ class SuperAdminManage(APIView):
             username = payload["user_name"].strip()
             phone = payload["contact_number"].strip()
 
-            # Format validation
             if not validate_email_format(email):
                 return Response({"status": "fail", "message": "Please enter a valid email"}, status=400)
             if not validate_phone_format(phone):
                 return Response({"status": "fail", "message": "Please enter a valid phone number"}, status=400)
 
-            # Duplicate check
             if AdminAccount.objects.filter(email=email, is_deleted=False).exists():
                 return Response({"status": "fail", "message": "This email is already registered"}, status=409)
             if AdminAccount.objects.filter(username=username, is_deleted=False).exists():
@@ -63,7 +58,6 @@ class SuperAdminManage(APIView):
             if AdminAccount.objects.filter(contact_number=phone, is_deleted=False).exists():
                 return Response({"status": "fail", "message": "This phone number is already in use"}, status=409)
 
-            # Create admin
             temp_pass = generate_secure_password(12)
             new_admin = AdminAccount.objects.create_superuser(
                 username=username,
@@ -76,7 +70,6 @@ class SuperAdminManage(APIView):
             new_admin.has_changed_initial_password = False
             new_admin.save()
 
-            # Send welcome email
             send_welcome_email_direct_smtp(
                 to_email=new_admin.email,
                 full_name=f"{new_admin.first_name} {new_admin.last_name}",
