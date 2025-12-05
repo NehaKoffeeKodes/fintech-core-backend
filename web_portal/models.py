@@ -1,14 +1,16 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
-
+from django.db import models
+from django.core.validators import EmailValidator
+from django.core.exceptions import ValidationError
+from django.conf import settings
 
 class AdminAccount(AbstractUser):
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(unique=True, db_index=True)
+    email = models.EmailField(db_index=True)
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
-    contact_number = models.CharField(max_length=15, blank=True, null=True, unique=True)
+    contact_number = models.CharField(max_length=15, blank=True, null=True)
     google_auth_key = models.CharField(max_length=100, blank=True, null=True)
     verify_code = models.CharField(max_length=255, blank=True, null=True)
     verify_code_expire_at = models.DateTimeField(null=True, blank=True)
@@ -29,6 +31,7 @@ class AdminAccount(AbstractUser):
 
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
 
 
 class SmtpEmail(models.Model):
@@ -104,7 +107,7 @@ class Adminbanner(models.Model):
         ordering = ['-created_at']
         
 
-class aboutus(models.Model):
+class Aboutus(models.Model):
     overview_id = models.AutoField(primary_key=True)
     company_story = models.TextField(blank=True, null=True)
     core_values = models.TextField(blank=True, null=True)
@@ -133,7 +136,7 @@ class aboutus(models.Model):
         
 
 
-class NewsUpdate(models.Model):
+class Latest_announcement(models.Model):
     news_id = models.AutoField(primary_key=True)
     headline = models.CharField(max_length=300, blank=False)
     details = models.TextField()
@@ -166,7 +169,8 @@ class ContactSupport(models.Model):
     TICKET_STATUS = [
         ('open', 'Open'),
         ('in_progress', 'In Progress'),
-        ('closed', 'Closed')
+        ('resolved', 'Resolved'),
+        ('closed', 'Closed'),
     ]
 
     ticket_id = models.AutoField(primary_key=True)
@@ -197,3 +201,163 @@ class ContactSupport(models.Model):
 
     def __str__(self):
         return f"Ticket #{self.ticket_id} - {self.customer_name}"
+    
+
+class ContactInfo(models.Model):
+    info_id = models.AutoField(primary_key=True)
+    
+    company_name = models.CharField(max_length=200)
+    tagline = models.CharField(max_length=300, blank=True)
+    support_email = models.EmailField()
+    support_phone = models.CharField(max_length=15)
+    whatsapp_number = models.CharField(max_length=15, blank=True, null=True)
+    address_line_1 = models.CharField(max_length=255)
+    address_line_2 = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
+    pincode = models.CharField(max_length=10)
+    gst_number = models.CharField(max_length=20, blank=True, null=True)
+    cin_number = models.CharField(max_length=30, blank=True, null=True)
+    
+    facebook = models.URLField(blank=True, null=True)
+    instagram = models.URLField(blank=True, null=True)
+    twitter = models.URLField(blank=True, null=True)
+    linkedin = models.URLField(blank=True, null=True)
+    youtube = models.URLField(blank=True, null=True)
+
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(AdminAccount, on_delete=models.PROTECT,related_name='contactinfo_created')
+    updated_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True, blank=True,related_name='contactinfo_updated')
+
+    class Meta:
+        db_table = "contact_info"
+        verbose_name = "Contact Info"
+        verbose_name_plural = "Contact Info"
+
+    def save(self, *args, **kwargs):
+        if self.support_email:
+            self.support_email = self.support_email.lower().strip()
+        if self.pk is not None:
+            self.updated_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.company_name or "Contact Info"
+    
+    
+
+class NewsUpdateRecord(models.Model):
+    record_id = models.AutoField(primary_key=True)
+    full_name = models.CharField(max_length=200, blank=True, null=True)
+    subscriber_email = models.EmailField(max_length=254, unique=True)
+    joined_on = models.DateTimeField(auto_now_add=True)
+    modified_by = models.ForeignKey(
+        AdminAccount, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    is_suspended = models.BooleanField(default=False)
+    is_removed = models.BooleanField(default=False)
+
+    def clean(self):
+        if self.subscriber_email:
+            try:
+                EmailValidator()(self.subscriber_email)
+            except ValidationError:
+                raise ValidationError({"subscriber_email": "Enter a valid email address."})
+
+    def save(self, *args, **kwargs):
+        if self.subscriber_email:
+            self.subscriber_email = self.subscriber_email.strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.subscriber_email or "No Email"
+
+    class Meta:
+        db_table = "news_update_record"
+        verbose_name = "News Update Record"
+        verbose_name_plural = "News Update Record"
+        
+
+class Sponsor(models.Model):
+    sponsor_code = models.AutoField(primary_key=True)
+    title = models.CharField(max_length=200, unique=True)
+    banner_image = models.CharField(max_length=500, null=True, blank=True)  
+    details = models.TextField(blank=True)
+    is_hidden = models.BooleanField(default=True)   
+    is_archived = models.BooleanField(default=False)
+    added_on = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(null=True, blank=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='added_sponsors')
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        db_table = 'core_sponsors'
+   
+   
+
+class SiteConfig(models.Model):
+    config_id = models.AutoField(primary_key=True)
+    
+    about_us_content = models.TextField(blank=True, null=True)
+    refund_policy_text = models.TextField(blank=True, null=True)
+    shipping_policy_text = models.TextField(blank=True, null=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+    
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='site_settings_created'
+    )
+
+    class Meta:
+        db_table = 'core_site_configuration'
+        verbose_name = 'Site Configuration'
+        verbose_name_plural = 'Site Configuration'
+
+    def __str__(self):
+        return "Global Site Settings"
+    
+
+class ServiceCategory(models.Model):
+    category_id = models.AutoField(primary_key=True)
+    category_title = models.CharField(max_length=200, unique=True)
+    short_info = models.TextField(blank=True, null=True)
+    is_hidden = models.BooleanField(default=False) 
+    added_on = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(null=True, blank=True)
+    added_by = models.ForeignKey(AdminAccount, on_delete=models.PROTECT, related_name='added_categories')
+    is_removed = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.category_title
+
+    class Meta:
+        db_table = 'store_product_category'
+        verbose_name_plural = "Product Categories"
+
+
+class Product(models.Model):
+    product_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=300)
+    thumbnail = models.ImageField(upload_to='products/thumbnails/')
+    details = models.TextField()
+    category = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='products', null=True, blank=True)
+    is_hidden = models.BooleanField(default=False)
+    added_on = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(null=True, blank=True)
+    added_by = models.ForeignKey(ServiceCategory, on_delete=models.PROTECT, related_name='added_products')
+    is_removed = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'store_product'

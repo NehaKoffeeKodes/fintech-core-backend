@@ -12,16 +12,17 @@ class ContactSupportView(APIView):
     def _submit_ticket_from_admin(self, request):
         try:
             with transaction.atomic():
-                serializer = ContactSupport(data=request.data)
+                serializer = ContactSupportSerializer(data=request.data)
                 if serializer.is_valid():
                     ticket = serializer.save(handled_by=request.user)
 
                     AdminActivityLog.objects.create(
-                        table_id=ticket.ticket_id,
-                        table_name='SupportTicket',
-                        ua_action='create',
-                        ua_description=f'Admin created support ticket for {ticket.customer_name}',
-                        created_by=request.user
+                        user=request.user,
+                        action='create',
+                        description=f'Admin created support ticket for {ticket.customer_name}',
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT'),
+                        request_data=request.data
                     )
 
                     return Response({
@@ -98,11 +99,12 @@ class ContactSupportView(APIView):
                 ticket.save()
 
                 AdminActivityLog.objects.create(
-                    table_id=ticket.ticket_id,
-                    table_name='SupportTicket',
-                    ua_action='status_update',
-                    ua_description=f'Status changed: {old} → {ticket.get_current_status_display()}',
-                    created_by=request.user
+                    user=request.user,
+                    action='update',
+                    description=f'Admin created support ticket for {ticket.customer_name}',
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT'),
+                    request_data=request.data
                 )
 
                 return Response({
@@ -126,17 +128,18 @@ class ContactSupportView(APIView):
                 ticket.is_archived = True
                 ticket.save()
 
-                ContactSupport.objects.create(
-                    table_id=ticket.ticket_id,
-                    table_name='SupportTicket',
-                    ua_action='archive',
-                    ua_description='Support ticket archived',
-                    created_by=request.user
+                AdminActivityLog.objects.create(
+                    user=request.user,
+                    action='delete',
+                    description=f'Admin created support ticket for {ticket.customer_name}',
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT'),
+                    request_data=request.data
                 )
 
                 return Response({
                     'status': 'success',
-                    'message': 'Support ticket archived successfully.'
+                    'message': 'Support ticket deleted successfully.'
                 })
 
         except ContactSupport.DoesNotExist:

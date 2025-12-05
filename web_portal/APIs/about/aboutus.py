@@ -5,7 +5,7 @@ class AboutusView(APIView):
 
     def get(self, request):
         try:
-            overview = aboutus.objects.first()
+            overview = Aboutus.objects.first()
             if not overview:
                 return Response({
                     'status': 'fail',
@@ -28,7 +28,7 @@ class AboutusView(APIView):
 
     def post(self, request):
         try:
-            existing = aboutus.objects.first()
+            existing = Aboutus.objects.first()
             if existing:
                 return Response({
                     'status': 'fail',
@@ -42,13 +42,12 @@ class AboutusView(APIView):
                     instance = serializer.save(created_by=request.user)
 
                     AdminActivityLog.objects.create(
-                        table_id=instance.overview_id,
-                        table_name='aboutus',
-                        ua_action='create',
-                        ua_description='Created company overview section',
-                        created_by=request.user,
-                        request_data=request.data,
-                        response_data=serializer.data
+                        user=request.user,
+                        action='create',
+                        description='Created company overview section',
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request_data=request.data
                     )
 
                     return Response({
@@ -71,7 +70,7 @@ class AboutusView(APIView):
 
     def put(self, request):
         try:
-            overview = aboutus.objects.first()
+            overview = Aboutus.objects.first()
             if not overview:
                 return Response({
                     'status': 'fail',
@@ -88,13 +87,12 @@ class AboutusView(APIView):
                     updated_instance = serializer.save()
 
                     AdminActivityLog.objects.create(
-                        table_id=updated_instance.overview_id,
-                        table_name='aboutus',
-                        ua_action='update',
-                        ua_description='Updated company overview content',
-                        created_by=request.user,
-                        request_data=request.data,
-                        response_data=serializer.data
+                        user=request.user,
+                        action='update',
+                        description='Updated company overview content',
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request_data=request.data
                     )
 
                     return Response({
@@ -121,7 +119,7 @@ class PublicaboutusView(APIView):
 
     def get(self, request):
         try:
-            overview = aboutus.objects.filter(is_active=True).first()
+            overview = Aboutus.objects.filter(is_active=True).first()
             if not overview:
                 return Response({
                     'status': 'fail',

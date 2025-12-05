@@ -140,13 +140,7 @@ class AdminBannerView(APIView):
                     photo_path = photo_path[6:]
                 item['profile_photo'] = f"http://{host}/media/{photo_path}"
 
-            add_serial_number(
-                data=serializer.data,
-                page_number=page,
-                page_size=size,
-                field_name="sr_no",
-                order="desc"
-            )
+            add_serial_numbers(serializer.data,page,size,order="desc")
             response_template.update({
                 "total_pages": total_pages,
                 "current_page": page,

@@ -118,7 +118,7 @@ class SuperAdminManageView(APIView):
                     "joined_on": admin.date_joined.strftime("%b %d, %Y")
                 })
 
-            paginated_data = add_serial_number(admin_list, page, size)
+            paginated_data = add_serial_numbers(admin_list, page, size)
 
             return Response({
                 "status": "success",

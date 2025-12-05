@@ -2,7 +2,7 @@ from ...views import*
 
 
 
-class LatestnewshubView(APIView):
+class LatestAnnouncementView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -20,13 +20,13 @@ class LatestnewshubView(APIView):
                 mutable_data = request.data.copy()
                 mutable_data['documents'] = saved_paths
 
-                serializer = NewsUpdateSerializer(data=mutable_data, context={'request': request})
+                serializer = LatestAnnouncementSerializer(data=mutable_data, context={'request': request})
                 if serializer.is_valid():
                     news = serializer.save(posted_by=request.user)
 
                     AdminActivityLog.objects.create(
                         table_id=news.news_id,
-                        table_name='NewsUpdate',
+                        table_name='Latest_announcement',
                         ua_action='create',
                         ua_description=f'Added new update: {news.headline}',
                         created_by=request.user,
@@ -55,7 +55,7 @@ class LatestnewshubView(APIView):
         os.makedirs(upload_dir, exist_ok=True)
 
         for file in files:
-            if file.size > 15 * 1024 * 1024:  # 15 MB limit
+            if file.size > 15 * 1024 * 1024: 
                 raise ValueError("Each document must be under 15 MB.")
             
             safe_name = "".join(c for c in file.name if c.isalnum() or c in "._- ")
@@ -80,7 +80,7 @@ class LatestnewshubView(APIView):
             if page_size < 1 or page_num < 1:
                 return Response({'status': 'fail', 'message': 'Invalid pagination values.'}, status=400)
 
-            queryset = NewsUpdate.objects.filter(is_removed=False)
+            queryset = Latest_announcement.objects.filter(is_removed=False)
             if not show_hidden:
                 queryset = queryset.filter(is_hidden=False)
             if news_id:
@@ -93,7 +93,7 @@ class LatestnewshubView(APIView):
             paginator = Paginator(queryset, page_size)
             page = paginator.get_page(page_num)
 
-            serializer = NewsUpdateSerializer(
+            serializer = LatestAnnouncementSerializer(
                 page.object_list, many=True, context={'request': request}
             )
 
@@ -124,10 +124,10 @@ class LatestnewshubView(APIView):
 
             with transaction.atomic():
                 try:
-                    news = NewsUpdate.objects.select_for_update().get(
+                    news = Latest_announcement.objects.select_for_update().get(
                         news_id=news_id, is_removed=False
                     )
-                except NewsUpdate.DoesNotExist:
+                except Latest_announcement.DoesNotExist:
                     return Response({'status': 'fail', 'message': 'News update not found.'}, status=404)
 
                 if len(request.data) == 1 or (len(request.data) == 2 and 'news_id' in request.data):
@@ -137,7 +137,7 @@ class LatestnewshubView(APIView):
                     msg = f'News update {"archived" if news.is_hidden else "made live"} successfully.'
 
                     AdminActivityLog.objects.create(
-                        table_id=news.news_id, table_name='NewsUpdate',
+                        table_id=news.news_id, table_name='Latest_announcement',
                         ua_action=action, ua_description=msg,
                         created_by=request.user
                     )
@@ -149,14 +149,14 @@ class LatestnewshubView(APIView):
                     current = news.documents or []
                     news.documents = current + new_paths
 
-                serializer = NewsUpdateSerializer(
+                serializer = LatestAnnouncementSerializer(
                     news, data=request.data, partial=True, context={'request': request}
                 )
                 if serializer.is_valid():
                     serializer.save()
 
                     AdminActivityLog.objects.create(
-                        table_id=news.news_id, table_name='NewsUpdate',
+                        table_id=news.news_id, table_name='Latest_announcement',
                         ua_action='update', ua_description='Updated news content',
                         created_by=request.user, request_data=request.data
                     )
@@ -178,12 +178,12 @@ class LatestnewshubView(APIView):
                 return Response({'status': 'fail', 'message': 'news_id required.'}, status=400)
 
             with transaction.atomic():
-                news = NewsUpdate.objects.get(news_id=news_id, is_removed=False)
+                news = Latest_announcement.objects.get(news_id=news_id, is_removed=False)
                 news.is_removed = True
                 news.save()
 
                 AdminActivityLog.objects.create(
-                    table_id=news.news_id, table_name='NewsUpdate',
+                    table_id=news.news_id, table_name='Latest_announcement',
                     ua_action='delete', ua_description='Removed news update',
                     created_by=request.user
                 )
@@ -193,7 +193,7 @@ class LatestnewshubView(APIView):
                     'message': 'News update removed permanently.'
                 })
 
-        except NewsUpdate.DoesNotExist:
+        except Latest_announcement.DoesNotExist:
             return Response({'status': 'fail', 'message': 'News not found.'}, status=404)
         except Exception as e:
             return Response({'status': 'error', 'message': str(e)}, status=500)

@@ -24,7 +24,7 @@ import qrcode
 import math
 from django.db.models import Q
 from web_portal.APIs.permissions.superadmin_permissions import IsSuperAdmin
-from web_portal.APIs.validation.superadmin_validation import add_serial_number
+from web_portal.APIs.validation.superadmin_validation import add_serial_numbers
 
 import random
 import string
@@ -41,7 +41,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.request import Request
 
 from rest_framework_simplejwt.exceptions import InvalidToken
-from django.http import JsonResponse
+
 
 
 from rest_framework import status
@@ -57,12 +57,5 @@ from web_portal.models import Adminbanner
 from web_portal.APIs.validation.superadmin_validation import *
 from web_portal.models import AdminActivityLog
 from django.core.paginator import Paginator
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.db import transaction
-from django.utils import timezone
-from django.core.paginator import Paginator
-from django.db.models import Q
+from django.core.paginator import EmptyPage
+from django.utils.timezone import now
