@@ -6,14 +6,14 @@ class ServiceRoutingControlView(APIView):
 
     def post(self, request):
         try:
-            if request.data.get('fetch_vendors'):
-                return self.get_vendor_list(request)
+            if request.data.get('fetch_admins'):
+                return self.get_admin_list(request)
             elif request.data.get('fetch_routing'):
                 return self.get_current_routing(request)
             else:
                 return Response({
                     "success": False,
-                    "message": "Invalid request type. Use 'fetch_vendors' or 'fetch_routing'."
+                    "message": "Invalid request type. Use 'fetch_admins' or 'fetch_routing'."
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
@@ -23,24 +23,24 @@ class ServiceRoutingControlView(APIView):
                 "error": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def get_vendor_list(self, request):
+    def get_admin_list(self, request):
         try:
-            vendors = ServiceProvider.objects.filter(
+            admins = ServiceProvider.objects.filter(
                 service__title='Money Transfer',
                 is_removed=False,
                 is_inactive=False
-            ).values('vendor_code', 'display_label')
+            ).values('admin_code', 'display_label')
 
             return Response({
                 "success": True,
-                "message": "Vendors fetched successfully",
-                "data": list(vendors)
+                "message": "admins fetched successfully",
+                "data": list(admins)
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({
                 "success": False,
-                "message": "Failed to fetch vendors"
+                "message": "Failed to fetch admins"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_current_routing(self, request):
@@ -95,8 +95,8 @@ class ServiceRoutingControlView(APIView):
                 }, status=status.HTTP_404_NOT_FOUND)
 
             for entry in current_routing:
-                if 'vendor_id' in entry:
-                    vid = int(entry['vendor_id'])
+                if 'admin_id' in entry:
+                    vid = int(entry['admin_id'])
                     if vid in new_order_ids:
                         new_priority = new_order_ids.index(vid) + 1
                         entry['priority'] = str(new_priority)

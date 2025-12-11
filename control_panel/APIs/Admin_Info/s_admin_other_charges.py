@@ -31,7 +31,7 @@ class SaManageChargesView(APIView):
             paginator = Paginator(queryset, limit)
             page_data = paginator.page(page)
 
-            serializer = SaAdditionalFeeSerializer(page_data, many=True)
+            serializer = SaAdditionalChargesSerializer(page_data, many=True)
 
             response_payload = {
                 "success": True,

@@ -41,19 +41,19 @@ class IsAdmin(BasePermission):
         except PortalUser.DoesNotExist:
             return False
 
-# def generate_jwt_token(user, expiry_minutes=None):
-#     refresh = RefreshToken.for_user(user)       
-#     refresh["role"] = "SUPERADMIN"
-#     refresh["username"] = user.username
-#     refresh["user_id"] = user.id
+def generate_jwt_token(user, expiry_minutes=None):
+    refresh = RefreshToken.for_user(user)       
+    refresh["role"] = "SUPERADMIN"
+    refresh["username"] = user.username
+    refresh["user_id"] = user.id
     
-#     if expiry_minutes:
-#         refresh.access_token.set_exp(lifetime=timedelta(minutes=expiry_minutes))
+    if expiry_minutes:
+        refresh.access_token.set_exp(lifetime=timedelta(minutes=expiry_minutes))
 
-#     return str(refresh.access_token)
+    return str(refresh.access_token)
 
 
-def generate_jwt_token(user, access_token_lifetime_minutes=None):
+def create_jwt_token(user, access_token_lifetime_minutes=None):
     try:
         role_map = {
             "ADMIN": "ADMIN",

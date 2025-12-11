@@ -1,4 +1,5 @@
 from django.urls import path
+from control_panel.APIs.Admin_Info.change_pass_word import *
 from control_panel.APIs.City.city import*
 from control_panel.APIs.HSNSAC.hsn_sac import*
 from control_panel.APIs.Admin_Info.admin_login_log_details import *
@@ -6,7 +7,7 @@ from control_panel.APIs.Admin_Info.admin_session_pass import*
 from control_panel.APIs.Admin_Info.pan_verification import*
 from control_panel.APIs.Admin_Info.block_admin import*
 from control_panel.APIs.Admin_Info.bank_details import*
-from control_panel.APIs.Admin_Info.Change_password import*
+from control_panel.APIs.Admin_Info.change_pass_word import*
 from control_panel.APIs.Admin_Info.fund_request import*
 from control_panel.APIs.Admin_Info.gst_tax_verification import*
 from control_panel.APIs.Admin_Info.s_admin_other_charges import *
@@ -14,7 +15,7 @@ from control_panel.APIs.Admin_Info.required_documents_list import *
 
 urlpatterns = [
     #HSNSAC
-    path('GST-Code-Manage/',GSTCodeManagerView.as_view()),
+    path('gst-code-manage/',GSTCodeManagerView.as_view()),
     
     #city_and_state 
     path('city/',CityListView.as_view()),

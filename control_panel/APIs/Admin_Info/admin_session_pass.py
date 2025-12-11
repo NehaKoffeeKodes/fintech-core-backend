@@ -16,7 +16,7 @@ class AdminSessionByPassView(APIView):
 
             switch_to_database(client.database_alias)
             portal_user = PortalUser.objects.using(client.database_alias).get(id=1)
-            temp_token = generate_jwt_token(portal_user, minutes=10)
+            temp_token = create_jwt_token(portal_user, minutes=10)
 
             response_data = {
                 'temp_access_token': str(temp_token),

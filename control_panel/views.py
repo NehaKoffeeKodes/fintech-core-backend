@@ -24,6 +24,11 @@ import os,requests,uuid
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from web_portal.serializers import *
+from admin_hub.models import *
+import csv
+from io import StringIO
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +39,9 @@ def store_uploaded_document(file_obj, sub_folder: str = "documents"):
     """
     if not file_obj:
         return None
-
-    # Ensure upload directory exists
+    
     target_dir = os.path.join(settings.MEDIA_ROOT, sub_folder)
     os.makedirs(target_dir, exist_ok=True)
-
-    # Secure filename (prevent directory traversal)
     safe_filename = os.path.basename(file_obj.name)
     destination_path = os.path.join(target_dir, safe_filename)
     relative_path = os.path.join(sub_folder, safe_filename)

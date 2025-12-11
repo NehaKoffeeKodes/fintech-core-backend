@@ -1,126 +1,164 @@
 from ...views import*
-import csv
-from io import StringIO
-
 
 
 class CityListView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    authentication_classes = [SecureJWTAuthentication]
+    # permission_classes = [IsSuperAdmin | IsAdmin | IsDistributor | IsRetailer]
+    permission_classes = [IsSuperAdmin | IsAdmin ]
+    
     def post(self, request):
-        if 'file' in request.FILES:
-            return self.import_locations_from_csv(request)
-        return self.retrieve_locations(request)
-
-    @transaction.atomic
-    def import_locations_from_csv(self, request):
         try:
-            file = request.FILES['file']
-            if not file.name.lower().endswith('.csv'):
-                return Response({'ok': False, 'msg': 'Only CSV files allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+            if request.FILES.get('file'):
+                return self._process_csv_upload(request)
+            return self._get_Location_list(request)
 
-            content = file.read().decode('utf-8-sig')
-            reader = csv.DictReader(StringIO(content))
+        except Exception as exc:
+            return Response({
+                "success": False,
+                "message": "An unexpected error occurred",
+                "error": str(exc)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def _process_csv_upload(self, request):
+        file_obj = request.FILES.get('file')
+
+        if not file_obj or not file_obj.name.lower().endswith('.csv'):
+            return Response({
+                "success": False,
+                "message": "Valid CSV file is required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            file_content = file_obj.read().decode('utf-8')
+            csv_reader = csv.DictReader(StringIO(file_content))
             created_count = 0
-            for row in reader:
-                row
-                cleaned = {k.strip(): v.strip() for k, v in row.items() if v}
-                
-                serializer = CityLocationSerializer(data=cleaned, context={'request': request})
+
+            for index, row in enumerate(csv_reader, start=2):
+                cleaned_row = {k.strip(): v.strip() for k, v in row.items() if k}
+
+                serializer = LocationDataSerializer(data=cleaned_row, model=Location)
                 if serializer.is_valid():
                     serializer.save()
                     created_count += 1
                 else:
                     return Response({
-                        'ok': False,
-                        'msg': 'Invalid data in CSV row.',
-                        'errors': serializer.errors,
-                        'row': cleaned
+                        "success": False,
+                        "message": f"Error in row {index}",
+                        "errors": serializer.errors
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-            AdminActivityLog.objects.create(
-                user=request.user,
-                action='BULK_LOCATION_IMPORT',
-                description=f'Imported {created_count} locations via CSV',
-                request_data={'file': file.name}
-            )
-
             return Response({
-                'ok': True,
-                'msg': f'{created_count} locations imported successfully!'
+                "success": True,
+                "message": f"{created_count} localities imported successfully."
             }, status=status.HTTP_201_CREATED)
 
+        except UnicodeDecodeError:
+            return Response({
+                "success": False,
+                "message": "Invalid CSV encoding. Please use UTF-8."
+            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({'ok': False, 'msg': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "success": False,
+                "message": "CSV processing failed",
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def retrieve_locations(self, request):
+    def _get_Location_list(self, request):
         try:
-            page = int(request.data.get('page_no', 1))
-            size = int(request.data.get('page_size', 20))
-            district_id = request.data.get('district_id')
-            city_search = request.data.get('search', '').strip()
-            district_name = request.data.get('district_name')
+            search_term = request.data.get('search', '').strip()
+            state_name = request.data.get('state_name', '').strip()
+            region_id = request.data.get('state_id')
+            page = int(request.data.get('page_number', 1))
+            limit = request.data.get('page_size', '20')
 
-            if page < 1 or size < 1:
-                return Response({'ok': False, 'msg': 'Invalid pagination.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            qs = CityLocation.objects.select_related('district').order_by('city_name')
-
-            if district_name:
+            if state_name:
                 try:
-                    district = District.objects.get(district_name__icontains=district_name, is_removed=False)
-                    qs = qs.filter(district=district)
-                except District.DoesNotExist:
-                    return Response({'ok': False, 'msg': 'District not found.'}, status=status.HTTP_404_NOT_FOUND)
+                    region_obj = Region.objects.get(name__iexact=state_name)
+                    region_id = region_obj.region_id
+                except Region.DoesNotExist:
+                    return Response({
+                        "success": False,
+                        "message": "Region not found with given name."
+                    }, status=status.HTTP_404_NOT_FOUND)
 
-            if district_id:
-                if not is_positive_integer(district_id):
-                    return Response({'ok': False, 'msg': 'Invalid district_id.'}, status=status.HTTP_400_BAD_REQUEST)
-                qs = qs.filter(district_id=district_id)
+            localities = Location.objects.select_related('region').filter(active=True).order_by('title')
 
-            if city_search:
-                qs = qs.filter(city_name__icontains=city_search)
+            if region_id:
+                localities = localities.filter(region_id=region_id)
+            if search_term:
+                localities = localities.filter(title__icontains=search_term)
 
-            total = qs.count()
+            total_records = localities.count()
 
-            if size == 0 or size is None: 
-                serializer = CityLocationSerializer(
-                    qs, many=True,
-                    context={'request': request, 'exclude_fields': ['created_at', 'updated_at', 'created_by', 'updated_by', 'is_removed']}
+            if str(limit) == "0":
+                serializer = LocationDataSerializer(
+                    localities,
+                    many=True,
+                    model=Location,
+                    context={
+                        'remove_fields': ['created_at', 'created_by', 'updated_at', 'updated_by', 'active']
+                    }
                 )
+                response_payload = {
+                    "total_pages": 1,
+                    "current_page": 1,
+                    "total_items": total_records,
+                    "results": serializer.data
+                }
                 return Response({
-                    'ok': True,
-                    'msg': 'All locations',
-                    'total': total,
-                    'data': serializer.data
+                    "success": True,
+                    "message": "All localities retrieved",
+                    "data": response_payload
                 }, status=status.HTTP_200_OK)
 
-            paginator = Paginator(qs, size)
+            paginator = Paginator(localities, limit)
             try:
-                page_data = paginator.page(page)
+                current_page = paginator.page(page)
             except EmptyPage:
-                return Response({'ok': False, 'msg': 'Page out of range.'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({
+                    "success": False,
+                    "message": "Requested page is out of range.",
+                    "data": {
+                        "total_pages": paginator.num_pages,
+                        "current_page": page,
+                        "total_items": total_records,
+                        "results": []
+                    }
+                }, status=status.HTTP_200_OK)
 
-            serializer = CityLocationSerializer(
-                page_data.object_list, many=True,
-                context={'request': request, 'exclude_fields': ['created_at', 'updated_at', 'created_by', 'updated_by', 'is_removed']}
+            serializer = LocationDataSerializer(
+                current_page.object_list,
+                many=True,
+                model=Location,
+                context={
+                    'remove_fields': ['created_at', 'created_by', 'updated_at', 'updated_by', 'active']
+                }
             )
 
-            add_serial_numbers(page, size, serializer.data, "asc")
-
-            payload = {
-                'pages': paginator.num_pages,
-                'current': page_data.number,
-                'count': total,
-                'list': serializer.data
+            response_payload = {
+                "total_pages": paginator.num_pages,
+                "current_page": current_page.number,
+                "total_items": total_records,
+                "results": serializer.data
             }
 
             return Response({
-                'ok': True,
-                'msg': 'Locations fetched.',
-                'result': payload
+                "success": True,
+                "message": "Localities retrieved successfully",
+                "data": response_payload
             }, status=status.HTTP_200_OK)
 
+        except ValueError as ve:
+            return Response({
+                "success": False,
+                "message": "Invalid pagination parameters",
+                "error": str(ve)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as e:
-            return Response({'ok': False, 'msg': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "success": False,
+                "message": "Failed to retrieve localities",
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -95,7 +95,7 @@ class GSTCodeManagerView(APIView):
                 context={'request': request, 'exclude_fields': ['added_by', 'added_on', 'updated_at', 'updated_by']}
             )
 
-            add_serial_numbers(page, limit, serializer.data, sort_order)
+            add_serial_numbers(serializer.data, page, limit, sort_order)
 
             result = {
                 'total': paginator.num_pages,

@@ -1,6 +1,9 @@
 from django.db import models
 from django.core.validators import RegexValidator
 from web_portal.models import*
+from django.contrib.auth import get_user_model
+from decimal import Decimal
+
 
 
 class GSTCode(models.Model):
@@ -27,57 +30,50 @@ class GSTCode(models.Model):
     
 
 
-class State(models.Model):
-    state_id = models.AutoField(primary_key=True)
-    state_name = models.CharField(max_length=100, unique=True)
-    state_code = models.CharField(max_length=10, blank=True)
-    is_active = models.BooleanField(default=True)
+class Region(models.Model): 
+    region_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=120, unique=True, db_index=True)
+    short_code = models.CharField(max_length=10, blank=True, null=True)
+    status = models.BooleanField(default=True)
+    added_on = models.DateTimeField(auto_now_add=True)
+    added_by = models.PositiveIntegerField(null=True, blank=True)
+    modified_on = models.DateTimeField(null=True, blank=True)
+    modified_by = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
-        db_table = 'master_state'
+        db_table = 'master_regions'
+        verbose_name = 'Region'
+        verbose_name_plural = 'Regions'
 
     def __str__(self):
-        return self.state_name
+        return self.name
+
+    def clean(self):
+        if self.short_code:
+            self.short_code = self.short_code.upper()
 
 
-class District(models.Model):
-    district_id = models.AutoField(primary_key=True)
-    district_name = models.CharField(max_length=150, unique=True)
-    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name='districts')
-    is_removed = models.BooleanField(default=False)
+class Location(models.Model): 
+    locality_id = models.AutoField(primary_key=True)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT, related_name='localities')
+    title = models.CharField(max_length=150)
+    active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(AdminAccount,on_delete=models.PROTECT,null=True,blank=True,related_name='districts_created')
-
-    class Meta:
-        db_table = 'master_district'
-        ordering = ['district_name']
-
-    def __str__(self):
-        return f"{self.district_name}, {self.state.state_name}"
-
-
-class CityLocation(models.Model):
-    city_id = models.AutoField(primary_key=True)
-    city_name = models.CharField(max_length=150)
-    district = models.ForeignKey(District, on_delete=models.CASCADE, related_name='cities')
-    pincode = models.CharField(max_length=10, blank=True)
-    is_active = models.BooleanField(default=True)
-    is_removed = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.PositiveIntegerField(null=True, blank=True)
     updated_at = models.DateTimeField(null=True, blank=True)
-    created_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,blank=True,related_name='cities_created')
-    updated_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,blank=True,related_name='cities_updated')
+    updated_by = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
-        db_table = 'master_city_location'
-        unique_together = ('city_name', 'district')
-        ordering = ['city_name']
+        db_table = 'master_locations'
+        unique_together = ('title', 'region')
+        verbose_name = 'Locality'
+        verbose_name_plural = ' Locations'
+        indexes = [
+            models.Index(fields=['title', 'region']),
+        ]
 
     def __str__(self):
-        return f"{self.city_name}, {self.district.district_name}"
-    
-    
-#admin_info model
+        return f"{self.title} ({self.region.name})"
 
 
 class PortalUser(models.Model):
@@ -97,46 +93,26 @@ class PortalUser(models.Model):
     member_id = models.AutoField(primary_key=True)
     full_name = models.CharField(max_length=200, db_index=True)
     email_address = models.EmailField(unique=True, db_index=True)
-    mobile_number = models.CharField(
-        max_length=10,
-        validators=[RegexValidator(r'^\d{10}$', 'Enter a valid 10-digit mobile number')]
-    )
+    mobile_number = models.CharField(max_length=10,validators=[RegexValidator(r'^\d{10}$', 'Enter a valid 10-digit mobile number')])
     access_pin = models.CharField(max_length=128, blank=True, null=True)
     member_type = models.CharField(max_length=30, choices=MEMBER_CATEGORY)
-    
     otp_token = models.CharField(max_length=100, blank=True, null=True)
-    otp_expiry = models.DateTimeField(blank=True, null=True)
-    
+    otp_expiry = models.DateTimeField(blank=True, null=True) 
     email_confirmed = models.BooleanField(default=False)
     virtual_account_active = models.BooleanField(default=False)
     kyc_completed = models.BooleanField(default=False)
-    
     aeps_service_status = models.CharField(max_length=50, default="NOT_STARTED")
     aeps_merchant_code = models.CharField(max_length=80, blank=True, null=True)
-    rejection_note = models.TextField(blank=True, null=True)
-    
+    rejection_note = models.TextField(blank=True, null=True)   
     service_config = models.JSONField(default=dict, blank=True, null=True)
     allowed_domains = models.JSONField(default=list, blank=True, null=True)
     active_modules = models.JSONField(default=list, blank=True, null=True)
     pinned_features = models.JSONField(default=dict, blank=True, null=True)
-    extra_info = models.JSONField(default=dict, blank=True, null=True)
-    
-    account_status = models.CharField(
-        max_length=30,
-        choices=WORKFLOW_STATUS,
-        default='PENDING_REVIEW'
-    )
-    
+    extra_info = models.JSONField(default=dict, blank=True, null=True) 
+    account_status = models.CharField(max_length=30,choices=WORKFLOW_STATUS,default='PENDING_REVIEW')
     two_factor_secret = models.CharField(max_length=80, blank=True, null=True)
-    
     registered_at = models.DateTimeField(auto_now_add=True)
-    registered_by = models.ForeignKey(
-        'self',
-        on_delete=models.PROTECT,
-        related_name='members_created_by_me',
-        null=True,
-        blank=True
-    )
+    registered_by = models.ForeignKey('self',on_delete=models.PROTECT,related_name='members_created_by_me',null=True,blank=True)
     last_updated = models.DateTimeField(auto_now=True)
     is_suspended = models.BooleanField(default=False)
     is_removed = models.BooleanField(default=False)
@@ -162,61 +138,25 @@ class PortalUser(models.Model):
 
 class PortalUserInfo(models.Model):
     profile_id = models.AutoField(primary_key=True)
-    
-    # Relations
-    user_account = models.OneToOneField(
-        PortalUser, 
-        on_delete=models.PROTECT, 
-        related_name='profile_details',
-        null=True,
-        blank=True
-    )
-    hierarchy_node = models.ForeignKey(
-        PortalUser, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True
-    )
-
-    # KYC Fields
+    user_account = models.OneToOneField(PortalUser,on_delete=models.PROTECT, related_name='profile_details',null=True,blank=True)
+    hierarchy_node = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,null=True,blank=True)
     unique_member_code = models.CharField(max_length=12,blank=True, unique=True)
-    aadhaar_number = models.CharField(
-        max_length=12,
-        validators=[RegexValidator(r'^\d{12}$', 'Aadhaar must be 12 digits')],
-        null=True, blank=True
-    )
-    pan_number = models.CharField(
-        max_length=10,
-        validators=[RegexValidator(r'^[A-Z]{5}[0-9]{4}[A-Z]$', 'Invalid PAN format')],
-        null=True, blank=True, unique=True
-    )
+    aadhaar_number = models.CharField(max_length=12,validators=[RegexValidator(r'^\d{12}$', 'Aadhaar must be 12 digits')],null=True, blank=True)
+    pan_number = models.CharField(max_length=10,validators=[RegexValidator(r'^[A-Z]{5}[0-9]{4}[A-Z]$', 'Invalid PAN format')],null=True, blank=True, unique=True)
     pan_verification_data = models.JSONField(null=True, blank=True)
-
-    # Business Info
     business_name = models.CharField(max_length=200, null=True, blank=True)
     outlet_photo = models.ImageField(upload_to='outlets/', null=True, blank=True)
-    outlet_coordinates = models.JSONField(null=True, blank=True)  # {lat, lng}
+    outlet_coordinates = models.JSONField(null=True, blank=True)  
     full_address = models.TextField(null=True, blank=True)
-    state_ref = models.ForeignKey(State, on_delete=models.SET_NULL, null=True, related_name='+')
-    city_ref = models.ForeignKey(CityLocation, on_delete=models.SET_NULL, null=True, related_name='+')
+    state_ref = models.ForeignKey(Region, on_delete=models.SET_NULL, null=True, related_name='+')
+    city_ref = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, related_name='+')
     pincode = models.CharField(max_length=6, validators=[RegexValidator(r'^\d{6}$')], null=True, blank=True)
-
-    # Documents & GST
-    supporting_documents = models.JSONField(default=list, blank=True)  # list of file paths
+    supporting_documents = models.JSONField(default=list, blank=True)  
     gstin = models.CharField(max_length=15, null=True, blank=True, unique=True)
-    business_category = models.CharField(max_length=20, null=True, blank=True)  # Retail, Wholesale etc.
+    business_category = models.CharField(max_length=20, null=True, blank=True)  
     secondary_mobile = models.CharField(max_length=10, null=True, blank=True)
-
-    # Current location during KYC
     live_location_capture = models.JSONField(null=True, blank=True)
-
-    # Audit
-    created_by_user = models.ForeignKey(
-        PortalUser,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='profiles_created'
-    )
+    created_by_user = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,null=True,related_name='profiles_created')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -233,7 +173,6 @@ class PortalUserInfo(models.Model):
     def __str__(self):
         return f"Profile: {self.user_account.full_name if self.user_account else 'N/A'} ({self.profile_id})" 
 
-# models.py
 
 class Admin(models.Model):
     GST_COMPOSITION = 'COMPOSITION'
@@ -265,39 +204,26 @@ class Admin(models.Model):
     entity_name = models.CharField(max_length=150, unique=True)
     mobile = models.CharField(max_length=10, unique=True)
     email = models.EmailField(unique=True)
-    avatar = models.ImageField(upload_to='entities/avatar/', null=True, blank=True)
-    
+    avatar = models.ImageField(upload_to='entities/avatar/', null=True, blank=True)   
     pan = models.CharField(max_length=10, unique=True, null=True, blank=True)
-    aadhaar = models.CharField(max_length=12, unique=True, null=True, blank=True)
-    
+    aadhaar = models.CharField(max_length=12, unique=True, null=True, blank=True)    
     is_pan_verified = models.BooleanField(default=False)
     is_gst_verified = models.BooleanField(default=False)
-    
     company_title = models.CharField(max_length=255, null=True, blank=True)
     gst_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
     gst_regime = models.CharField(max_length=20, choices=GST_REGIME_CHOICES, default=GST_COMPOSITION)
-    
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     rejection_reason = models.TextField(null=True, blank=True)
-    
     documents_uploaded = models.JSONField(default=list, blank=True)
-    registered_state = models.ForeignKey(State, on_delete=models.SET_NULL, null=True)
-    registered_city = models.ForeignKey(CityLocation, on_delete=models.SET_NULL, null=True)
+    registered_state = models.ForeignKey(Region, on_delete=models.SET_NULL, null=True)
+    registered_city = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True)
     pin_code = models.CharField(max_length=6, null=True, blank=True)
-    
     enabled_services = models.JSONField(default=list, blank=True)
     agreement_pdf = models.FileField(upload_to='agreements/', null=True, blank=True)
-    
     is_active = models.BooleanField(default=True)
     is_soft_deleted = models.BooleanField(default=False)
-    
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        PortalUser,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='entities_created_by'
-    )
+    created_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,null=True,related_name='entities_created_by')
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
@@ -313,56 +239,131 @@ class Admin(models.Model):
     class Meta:
         db_table = 'platform_business_entities'
         
+  
+
+class SaCoreService(models.Model):
+    service_key = models.AutoField(primary_key=True)
+    title = models.CharField(max_length=80, unique=True)
+    routing_order = models.JSONField(null=True, blank=True) 
+    details = models.TextField(blank=True, null=True)
+    last_modified = models.DateTimeField(auto_now=True)
+    modified_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True)
+    disabled = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'core_services'
+        verbose_name = "Core Service"
+
+    def __str__(self):
+        return self.title
+
+
+class ServiceProvider(models.Model):
+    TDS_WITH = 'WITH_TDS'
+    TDS_WITHOUT = 'WITHOUT_TDS'
+    TDS_OPTIONS = [(TDS_WITH, 'With TDS'), (TDS_WITHOUT, 'Without TDS')]
+    admin_id = models.AutoField(primary_key=True)
+    service = models.ForeignKey(SaCoreService, on_delete=models.CASCADE, related_name='admins')
+    admin_code = models.CharField(max_length=100, unique=True)
+    display_label = models.CharField(max_length=200)
+    api_credentials = models.JSONField(null=True, blank=True)
+    required_params = models.JSONField(null=True, blank=True)
+    hsn_code = models.ForeignKey(GSTCode, on_delete=models.SET_NULL, null=True, blank=True)
+    tds_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    tds_applicable = models.CharField(max_length=20, choices=TDS_OPTIONS, null=True, blank=True)
+    wallet_type = models.CharField(max_length=30, null=True, blank=True)
+    supports_balance_check = models.BooleanField(default=False)
+    is_charge_service = models.BooleanField(default=False)
+    platform_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    charge_type = models.CharField(max_length=10, null=True, blank=True)
+    last_updated = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True)
+    is_inactive = models.BooleanField(default=False)
+    is_removed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'service_admins'
+
+    def __str__(self):
+        return f"{self.display_label} ({self.admin_code})"
+
+
+
+User = get_user_model()
+
+class AdminService(models.Model):
+    assignment_id = models.AutoField(primary_key=True)
+    admin = models.ForeignKey(Admin,on_delete=models.CASCADE,related_name='assigned_services',null=True,blank=True)
+    service = models.ForeignKey(SaCoreService,on_delete=models.PROTECT,related_name='admin_assignments')
+    provider = models.ForeignKey(ServiceProvider,on_delete=models.PROTECT,related_name='admin_service_links')
+    commission_structure = models.JSONField(default=dict,blank=True)
+    commission_rate = models.DecimalField(max_digits=8,decimal_places=4)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,related_name='service_assignments_created')
+    is_suspended = models.BooleanField(default=False)
+    is_removed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'admin_service_assignments'
+        unique_together = ('admin', 'service', 'provider')  
+        verbose_name = 'admin Service Assignment'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.admin} ← {self.service.name} ({self.provider})"
+  
+  
+
+class AdminContract(models.Model):
+    STATUS_CHOICES = [
+        ('DRAFT', 'Draft'),
+        ('UNDER_REVIEW', 'Under Review'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+        ('TERMINATED', 'Terminated')
+    ]
+
+    contract_id = models.AutoField(primary_key=True)
+    base_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    gst_component = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True, editable=False)
+    signed_document = models.FileField(upload_to='contracts/signed/', null=True, blank=True)
+    contract_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_contracts')
+    admin = models.ForeignKey(Admin, on_delete=models.CASCADE, related_name='contracts', null=True)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'admin_contracts'
+        ordering = ['-created_at']
+        verbose_name = 'admin Contract'
+        verbose_name_plural = 'admin Contracts'
+
+    def __str__(self):
+        return f"Contract #{self.contract_id} - {self.admin.business_name if self.admin else 'N/A'}"
+        
 
 class PaymentGatewayBank(models.Model):
-    """
-    Stores bank account details used for deposits & withdrawals with service-wise charges
-    """
     bank_id = models.AutoField(primary_key=True)
-    
-    # JSON field to store which services/deposit methods this bank supports
-    supported_services = models.JSONField(
-        default=list,
-        help_text="Example: ['UPI', 'IMPS', 'NEFT', 'Cash Deposit']"
-    )
-    
+    supported_services = models.JSONField(default=list)
     bank_full_name = models.CharField(max_length=200, blank=True, null=True)
-    ifsc = models.CharField(
-        max_length=11,
-        validators=[RegexValidator(r'^[A-Z]{4}0[A-Z0-9]{6}$', 'Enter valid IFSC code')],
-        blank=True,
-        null=True
-    )
+    ifsc = models.CharField(max_length=11,validators=[RegexValidator(r'^[A-Z]{4}0[A-Z0-9]{6}$', 'Enter valid IFSC code')],blank=True,null=True)
     branch = models.CharField(max_length=150, blank=True, null=True)
     account_holder_name = models.CharField(max_length=200, blank=True, null=True)
     account_no = models.CharField(max_length=30, blank=True, null=True)
-    account_category = models.CharField(max_length=50, blank=True, null=True)  # Savings/Current etc.
-
-    # Charge configuration per channel
+    account_category = models.CharField(max_length=50, blank=True, null=True) 
     upi_imps_charges = models.JSONField(default=dict, blank=True, null=True)
     cash_deposit_machine_charges = models.JSONField(default=dict, blank=True, null=True)
     over_the_counter_charges = models.JSONField(default=dict, blank=True, null=True)
-
-    # Status & Audit
     is_active = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
-    
     added_on = models.DateTimeField(auto_now_add=True)
-    added_by = models.ForeignKey(
-        PortalUser,
-        on_delete=models.PROTECT,
-        related_name='bank_accounts_added',
-        null=True,
-        blank=True
-    )
+    added_by = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='bank_accounts_added',null=True,blank=True)
     modified_on = models.DateTimeField(auto_now=True)
-    modified_by = models.ForeignKey(
-        PortalUser,
-        on_delete=models.SET_NULL,
-        related_name='bank_accounts_modified',
-        null=True,
-        blank=True
-    )
+    modified_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,related_name='bank_accounts_modified',null=True,blank=True)
 
     class Meta:
         db_table = 'gateway_banks_config'
@@ -384,34 +385,18 @@ class PaymentGatewayBank(models.Model):
 
 class DepositBankAccount(models.Model):
     account_id = models.AutoField(primary_key=True)
-    
-    # Which deposit methods this bank supports (UPI, IMPS, Cash, etc.)
-    enabled_channels = models.JSONField(
-        default=list,
-        help_text="List of allowed deposit channels e.g. ['UPI', 'NEFT', 'Cash Deposit']"
-    )
-
+    enabled_channels = models.JSONField(default=list)
     bank_title = models.CharField(max_length=180, blank=True, null=True)
-    ifsc_code = models.CharField(
-        max_length=11,
-        validators=[RegexValidator(r'^[A-Z]{4}0[A-Z0-9]{6}$')],
-        blank=True,
-        null=True,
-        unique=True
-    )
+    ifsc_code = models.CharField(max_length=11,validators=[RegexValidator(r'^[A-Z]{4}0[A-Z0-9]{6}$')],blank=True,null=True,unique=True)
     branch_location = models.CharField(max_length=200, blank=True, null=True)
     holder_name = models.CharField(max_length=200, blank=True, null=True)
     account_number = models.CharField(max_length=30, unique=True, blank=True, null=True)
-    account_kind = models.CharField(max_length=50, blank=True, null=True)  # Current/Savings
-
-    # Channel-wise charges
-    digital_transfer_fees = models.JSONField(default=dict, blank=True, null=True)      # UPI/IMPS/NEFT
+    account_kind = models.CharField(max_length=50, blank=True, null=True)  
+    digital_transfer_fees = models.JSONField(default=dict, blank=True, null=True)      
     cdm_deposit_fees = models.JSONField(default=dict, blank=True, null=True)
     branch_counter_fees = models.JSONField(default=dict, blank=True, null=True)
-
     is_enabled = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
-
     added_at = models.DateTimeField(auto_now_add=True)
     added_by = models.ForeignKey(
         PortalUser,
@@ -439,7 +424,6 @@ class DepositBankAccount(models.Model):
 
 
 
-# models.py (same file ya alag rakh sakte ho)
 
 class FundRequestStatus(models.TextChoices):
     PENDING = 'PENDING', 'Pending'
@@ -533,16 +517,12 @@ class FundDepositRequest(models.Model):
 from django.db import models
 
 class MemberActionLog(models.Model):
-    """
-    Tracks all user actions across the platform
-    Same logic as UserActivity but completely fresh & clean
-    """
     log_id = models.AutoField(primary_key=True)
     
     record_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     module_name = models.CharField(max_length=100, db_index=True, null=True, blank=True)
     
-    action_type = models.CharField(max_length=80, db_index=True)  # LOGIN, CREATE, UPDATE, DELETE, APPROVE etc.
+    action_type = models.CharField(max_length=80, db_index=True) 
     action_details = models.TextField(blank=True, null=True)
     
     performed_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -553,7 +533,7 @@ class MemberActionLog(models.Model):
         related_name='action_logs'
     )
     
-    request_payload = models.JSONField(null=True, blank=True)   # Better than TextField
+    request_payload = models.JSONField(null=True, blank=True)   
     response_payload = models.JSONField(null=True, blank=True)
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
@@ -570,21 +550,13 @@ class MemberActionLog(models.Model):
         return f"{user} → {self.action_type} on {self.module_name or 'Unknown'}"
 
 
-# models.py
 
-from django.db import models
-from decimal import Decimal
-
-# Choices (same logic as MrkTyChoice)
 TRANSACTION_NATURE = [
     ('CR', 'Credit'),
     ('DR', 'Debit'),
 ]
 
 class GlTrn(models.Model):
-    """
-    Global Ledger - Har transaction ka master record (jaise GL)
-    """
     entry_id = models.AutoField(primary_key=True)
     
     linked_service_id = models.BigIntegerField(null=True, blank=True)
@@ -596,7 +568,7 @@ class GlTrn(models.Model):
         related_name='ledger_entries'
     )
 
-    transaction_type = models.CharField(max_length=100, blank=True)  # Fund Request, Payout, Refund etc.
+    transaction_type = models.CharField(max_length=100, blank=True) 
     amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
     
     tds_percent = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal('0.0000'))
@@ -604,11 +576,11 @@ class GlTrn(models.Model):
     tds_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 
-    source_table = models.CharField(max_length=100, blank=True)  # jahan se transaction aaya
-    wallet_type = models.CharField(max_length=30, blank=True)     # MAIN, BONUS, etc.
+    source_table = models.CharField(max_length=100, blank=True)  
+    wallet_type = models.CharField(max_length=30, blank=True)    
     
     final_amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
-    entry_nature = models.CharField(max_length=6, choices=TRANSACTION_NATURE)  # CR / DR
+    entry_nature = models.CharField(max_length=6, choices=TRANSACTION_NATURE) 
 
     transaction_time = models.DateTimeField(null=True, blank=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
@@ -622,13 +594,10 @@ class GlTrn(models.Model):
 
 
 class WalletHistory(models.Model):
-    """
-    Wallet ka har credit/debit ka record
-    """
     history_id = models.AutoField(primary_key=True)
     
-    reference_id = models.BigIntegerField(null=True, blank=True)   # kisi service se linked
-    action_name = models.CharField(max_length=150)                 # "Fund Added", "Commission", "Payout"
+    reference_id = models.BigIntegerField(null=True, blank=True)   
+    action_name = models.CharField(max_length=150)                 
 
     user = models.ForeignKey(
         PortalUser,
@@ -636,9 +605,9 @@ class WalletHistory(models.Model):
         related_name='wallet_history'
     )
 
-    wallet_name = models.CharField(max_length=50)                  # MAIN_WALLET, REWARD_WALLET
+    wallet_name = models.CharField(max_length=50)                 
     changed_amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
-    change_type = models.CharField(max_length=6, choices=TRANSACTION_NATURE)  # CR or DR
+    change_type = models.CharField(max_length=6, choices=TRANSACTION_NATURE)  
 
     balance_after = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
     remarks = models.CharField(max_length=500, blank=True)
@@ -662,8 +631,7 @@ class WalletHistory(models.Model):
 class AdditionalFee(models.Model):
     fee_id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=150, blank=True, null=True)
-    # oc_name
-    category = models.CharField(max_length=60, blank=True, null=True)   # charge_type
+    category = models.CharField(max_length=60, blank=True, null=True)  
     amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     tax_code = models.ForeignKey(GSTCode, on_delete=models.SET_NULL, null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -694,8 +662,7 @@ class PortalUserBalance(models.Model):
         null=True,
         blank=True
     )
-
-    # Main wallets
+    
     primary_balance = models.DecimalField(
         max_digits=20, decimal_places=3, default=0.000, help_text="Main usable wallet"
     )
@@ -703,7 +670,6 @@ class PortalUserBalance(models.Model):
         max_digits=20, decimal_places=3, default=0.000, help_text="Commission / Referral earnings"
     )
 
-    # Optional / special purpose wallets
     deposit_balance = models.DecimalField(
         max_digits=20, decimal_places=3, default=0.000, null=True, blank=True
     )
@@ -717,7 +683,6 @@ class PortalUserBalance(models.Model):
         max_digits=20, decimal_places=3, default=0.000, null=True, blank=True, help_text="Lien / Frozen amount"
     )
 
-    # Audit fields
     created_on = models.DateTimeField(auto_now_add=True)
     last_updated_on = models.DateTimeField(null=True, blank=True)
     last_updated_by = models.PositiveIntegerField(null=True, blank=True)
@@ -746,12 +711,63 @@ class PortalUserBalance(models.Model):
 
 
 
+User = get_user_model()
 
-class SaAdditionalFee(models.Model):
+class ChargeRule(models.Model):
+    TYPE_CHOICES = (('CREDIT', 'Credit'), ('DEBIT', 'Debit'))
+    RATE_MODE_CHOICES = (('FLAT', 'Flat Amount'), ('PERCENT', 'Percentage'))
+    CATEGORY_CHOICES = (('OUR_SHARE', 'Our Share'), ('admin_SHARE', 'admin Share'))
+
+    rule_id = models.AutoField(primary_key=True)
+
+    service_provider = models.ForeignKey(
+        'ServiceProvider',
+        on_delete=models.CASCADE,
+        related_name='charge_rules'
+    )
+
+    charge_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    rate_mode = models.CharField(max_length=15, choices=RATE_MODE_CHOICES)
+    
+    min_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    max_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    rate_value = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    
+    linked_identifier = models.PositiveIntegerField(null=True, blank=True, help_text="e.g., Operator ID, Biller ID")
+    
+    charge_beneficiary = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default='OUR_SHARE'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+    updated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='modified_charge_rules'
+    )
+    
+    is_disabled = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'provider_charge_rules'
+        verbose_name = 'Charge Rule'
+        verbose_name_plural = 'Charge Rules'
+        ordering = ['-created_at']
+        unique_together = ('service_provider', 'linked_identifier', 'charge_type', 'charge_beneficiary')
+
+    def __str__(self):
+        return f"Rule {self.rule_id} | {self.service_provider.label} | {self.get_charge_type_display()} | {self.rate_value or 0}"
+    
+    
+
+
+class SaAdditionalCharges(models.Model):
     fee_id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=150, blank=True, null=True)
-    # oc_name
-    category = models.CharField(max_length=60, blank=True, null=True)   # charge_type
+    category = models.CharField(max_length=60, blank=True, null=True)  
     amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     tax_code = models.ForeignKey(GSTCode, on_delete=models.SET_NULL, null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -768,59 +784,6 @@ class SaAdditionalFee(models.Model):
     def __str__(self):
         return f"{self.title or 'No Title'} ({self.amount or 0})"
     
-
-
-
-
-class SaCoreService(models.Model):
-    service_key = models.AutoField(primary_key=True)
-    title = models.CharField(max_length=80, unique=True)
-    routing_order = models.JSONField(null=True, blank=True)  # same as priority
-    details = models.TextField(blank=True, null=True)
-    last_modified = models.DateTimeField(auto_now=True)
-    modified_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True)
-    disabled = models.BooleanField(default=False)
-
-    class Meta:
-        db_table = 'core_services'
-        verbose_name = "Core Service"
-
-    def __str__(self):
-        return self.title
-
-
-class ServiceProvider(models.Model):
-    TDS_WITH = 'WITH_TDS'
-    TDS_WITHOUT = 'WITHOUT_TDS'
-    
-    TDS_OPTIONS = [(TDS_WITH, 'With TDS'), (TDS_WITHOUT, 'Without TDS')]
-
-    vendor_id = models.AutoField(primary_key=True)
-    service = models.ForeignKey(SaCoreService, on_delete=models.CASCADE, related_name='vendors')
-    vendor_code = models.CharField(max_length=100, unique=True)
-    display_label = models.CharField(max_length=200)
-    api_credentials = models.JSONField(null=True, blank=True)
-    required_params = models.JSONField(null=True, blank=True)
-    hsn_code = models.ForeignKey(GSTCode, on_delete=models.SET_NULL, null=True, blank=True)
-    tds_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    tds_applicable = models.CharField(max_length=20, choices=TDS_OPTIONS, null=True, blank=True)
-    wallet_type = models.CharField(max_length=30, null=True, blank=True)
-    supports_balance_check = models.BooleanField(default=False)
-    is_charge_service = models.BooleanField(default=False)
-    platform_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    charge_type = models.CharField(max_length=10, null=True, blank=True)
-    last_updated = models.DateTimeField(auto_now=True)
-    updated_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True)
-    is_inactive = models.BooleanField(default=False)
-    is_removed = models.BooleanField(default=False)
-
-    class Meta:
-        db_table = 'service_vendors'
-
-    def __str__(self):
-        return f"{self.display_label} ({self.vendor_code})"
-
-
 
 
 class DocumentTemplate(models.Model):
