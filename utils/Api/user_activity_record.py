@@ -3,10 +3,6 @@ from rest_framework import status
 from control_panel.models import*
 
 def record_member_activity(activity_data: dict):
-    """
-    Log user activity with proper try-except and response
-    Same logic as add_user_activity
-    """
     try:
         MemberActionLog.objects.create(**activity_data)
         return Response({

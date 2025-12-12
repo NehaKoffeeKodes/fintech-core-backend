@@ -199,7 +199,34 @@ class DmtTransferClient(models.Model):
         app_label = 'customers'
         ordering = ['-joined_on']
    
-   
+
+
+class GovernmentChargeLog(models.Model):
+    entry_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='govt_charges')
+    provider = models.ForeignKey(ServiceProvider,on_delete=models.PROTECT,null=True,blank=True)
+    transaction_ref = models.CharField(max_length=150, blank=True)
+    charge_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    charge_type = models.CharField(max_length=20, blank=True) 
+    applied_on = models.CharField(max_length=50, blank=True)   
+    hierarchy_level = models.CharField(max_length=10, blank=True) 
+    user_role = models.CharField(max_length=30, blank=True)      
+    base_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    final_charge = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'govt_charge_entries'
+        app_label = 'charges'
+        ordering = ['-recorded_at']
+        verbose_name = "Government Levy Entry"
+        verbose_name_plural = "Government Levy Entries"
+
+    def __str__(self):
+        return f"{self.charge_type} ₹{self.final_charge} on {self.transaction_ref or 'Manual'}"
+        
 
 class GlobalBankList(models.Model):
     bank_id = models.AutoField(primary_key=True)

@@ -10,7 +10,7 @@ from django.conf import settings
 
 from web_portal.models import *
 from fintech_backend.customjwt_auth import *
-from utils.notify_service import *
+from utils.sa_notification.notify_service import *
 from django.contrib.auth.hashers import check_password, make_password
 from .serializers import *
 from django.core.files.storage import default_storage
@@ -41,7 +41,7 @@ from rest_framework.request import Request
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework import status
 from web_portal.models import AdminAccount
-from utils.helpers import *
+from utils.Api.helpers import *
 
 import os
 from django.db.models import Q

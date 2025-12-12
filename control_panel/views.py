@@ -13,12 +13,12 @@ from datetime import timezone
 from web_portal.models import *
 from fintech_backend.customjwt_auth import*
 import logging
-from utils.core_utils import*
+from utils.Api.core_utils import*
 import json
 from utils.log_file.log import save_api_log
-from utils.user_activity_record import record_member_activity
+from utils.Api.user_activity_record import record_member_activity
 from validation.db_helper_function import get_database_from_domain, switch_to_database
-from utils.core_utils import *
+from utils.Api.core_utils import *
 from rest_framework_simplejwt.tokens import AccessToken
 import os,requests,uuid
 from django.conf import settings
