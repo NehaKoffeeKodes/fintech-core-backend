@@ -110,7 +110,7 @@ class CustomerTestimonialView(APIView):
                 'status': 'success',
                 'message': 'Testimonials fetched',
                 'result': result
-            }, status=200)
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({

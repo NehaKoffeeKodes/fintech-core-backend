@@ -9,10 +9,6 @@ CASHFREE_BASE_URL = os.getenv("CASHFREE_BASE_URL")
 
 
 class PanVerificationView(APIView):
-    """
-    Advanced PAN verification with name matching via Cashfree
-    Generates unique verification_id like TCPL20250405123045A1B2C3
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -39,7 +35,7 @@ class PanVerificationView(APIView):
         with transaction.atomic():
             random_hex = uuid.uuid4().hex[:6].upper()
             timestamp_str = datetime.now().strftime('%Y%m%d%H%M%S')
-            verification_ref = f"TCPL{timestamp_str}{random_hex}"
+            verification_ref = f"FINTECH{timestamp_str}{random_hex}"
 
         payload = {
             "pan": pan_number,

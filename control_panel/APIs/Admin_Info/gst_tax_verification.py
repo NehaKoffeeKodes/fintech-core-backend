@@ -9,10 +9,6 @@ CASHFREE_BASE_URL = os.getenv("CASHFREE_BASE_URL")
 
 
 class VerifyGSTApiView(APIView):
-    """
-    Secure GSTIN verification using Cashfree API
-    Only authenticated users allowed
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

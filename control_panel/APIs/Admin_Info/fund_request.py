@@ -27,12 +27,12 @@ class ManageFundRequestsView(APIView):
 
             valid_channels = ['counter_deposit', 'cdm_deposit', 'online_transfer']
             if channel not in valid_channels:
-                return Response({"error": True, "message": f"Channel must be one of: {valid_channels}"}, status=400)
+                return Response({"error": True, "message": f"Channel must be one of: {valid_channels}"}, status=status.HTTP_400_BAD_REQUEST)
 
             try:
                 bank = DepositBankAccount.objects.get(account_id=bank_id, is_archived=False)
             except DepositBankAccount.DoesNotExist:
-                return Response({"error": True, "message": "Bank account not found"}, status=404)
+                return Response({"error": True, "message": "Bank account not found"}, status=status.HTTP_404_NOT_FOUND)
 
             charges = {}
             if channel == 'online_transfer':
@@ -48,11 +48,11 @@ class ManageFundRequestsView(APIView):
                 return Response({
                     "error": True,
                     "message": f"Amount must be between ₹{min_amt} and ₹{max_amt}"
-                }, status=400)
+                }, status=status.HTTP_400_BAD_REQUEST)
 
             proof_path = store_uploaded_document(proof_file, "fund_proofs")
             if not proof_path:
-                return Response({"error": True, "message": "Failed to upload proof"}, status=400)
+                return Response({"error": True, "message": "Failed to upload proof"}, status=status.HTTP_400_BAD_REQUEST)
 
            
 
@@ -92,7 +92,7 @@ class ManageFundRequestsView(APIView):
 
         except Exception as e:
             save_api_log(request, "CreateFundRequest", request.data, {"error": str(e)})
-            return Response({"error": True, "message": "Something went wrong"}, status=500)
+            return Response({"error": True, "message": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
     def get(self, request):
@@ -145,7 +145,7 @@ class ManageFundRequestsView(APIView):
             })
 
         except Exception as e:
-            return Response({"error": True, "message": str(e)}, status=500)
+            return Response({"error": True, "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def patch(self, request):
         try:
@@ -154,17 +154,17 @@ class ManageFundRequestsView(APIView):
             reason = request.data.get('reason')
 
             if not req_id or not action:
-                return Response({"error": True, "message": "request_id and action required"}, status=400)
+                return Response({"error": True, "message": "request_id and action required"}, status=status.HTTP_400_BAD_REQUEST)
 
             if request.user.member_type != "SUPER_ADMIN":
-                return Response({"error": True, "message": "Only super admin can approve"}, status=403)
+                return Response({"error": True, "message": "Only super admin can approve"}, status=status.HTTP_403_FORBIDDEN)
 
             fund_req = FundDepositRequest.objects.get(request_ref=req_id)
 
             if action == "APPROVED" and fund_req.status != "PENDING":
-                return Response({"error": True, "message": "Already processed"}, status=400)
+                return Response({"error": True, "message": "Already processed"}, status=status.HTTP_400_BAD_REQUEST)
             if action == "REVERSED" and fund_req.status != "APPROVED":
-                return Response({"error": True, "message": "Can only reverse approved requests"}, status=400)
+                return Response({"error": True, "message": "Can only reverse approved requests"}, status=status.HTTP_400_BAD_REQUEST)
 
             admin_contact = fund_req.submitted_by.mobile
             db_name = get_database_from_domain() or "default"
@@ -201,22 +201,20 @@ class ManageFundRequestsView(APIView):
             return Response({"success": True, "message": f"Request {action.lower()} successfully"})
 
         except Exception as e:
-            return Response({"error": True, "message": str(e)}, status=500)
+            return Response({"error": True, "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):
         req_id = request.data.get('request_id')
         if not req_id:
-            return Response({"error": True, "message": "request_id required"}, status=400)
+            return Response({"error": True, "message": "request_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             req = FundDepositRequest.objects.get(request_ref=req_id, is_removed=False)
             if req.status != "PENDING":
-                return Response({"error": True, "message": "Only pending requests can be deleted"}, status=400)
+                return Response({"error": True, "message": "Only pending requests can be deleted"}, status=status.HTTP_400_BAD_REQUEST)
 
             if req.submitted_by != request.user and request.user.member_type != "SUPER_ADMIN":
-                return Response({"error": True, "message": "Not allowed"}, status=403)
-
-           
+                return Response({"error": True, "message": "Not allowed"}, status=status.HTTP_403_FORBIDDEN)
 
             req.is_removed = True
             req.save()
@@ -224,7 +222,7 @@ class ManageFundRequestsView(APIView):
             return Response({"success": True, "message": "Request deleted"})
 
         except FundDepositRequest.DoesNotExist:
-            return Response({"error": True, "message": "Not found"}, status=404)
+            return Response({"error": True, "message": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def get_admin_contact(self, user):
         if user.member_type == "SUPER_ADMIN":

@@ -1,18 +1,21 @@
-from master_data.models import GlobalBillerGroup, GlobalOperator
-from tenant_app.models import BillerGroup, OperatorList, HierarchyLevel, DefaultChargeHead
+from admin_hub.models import*
+from control_panel.models import *
 
-def seed_initial_master_data(target_db):
-    for cat in GlobalBillerGroup.objects.filter(active=True):
-        BillerGroup.objects.using(target_db).get_or_create(
-            name=cat.group_name,
-            defaults={'is_disabled': True}
+def master_data(db_name):
+    for old_cat in SaBillerGroup.objects.filter(is_deleted=False):
+        BillerGroup.objects.using(db_name).get_or_create(
+            name=old_cat.ss_name,
+            defaults={'is_active': False}
         )
 
-    for op in GlobalOperator.objects.filter(active=True):
-        OperatorList.objects.using(target_db).get_or_create(
-            operator_name=op.operator_name,
-            op_code=op.op_code,
-            defaults={'is_disabled': True, 'service_type': op.service_type}
+    for old_op in SaGlobalOperator.objects.filter(is_deleted=False):
+        OperatorList.objects.using(db_name).get_or_create(
+            operator_name=old_op.ss_name,
+            op_code=old_op.operator_code,
+            defaults={
+                'operator_type': old_op.operator_type,
+                'is_active': False
+            }
         )
 
     levels = [
@@ -20,18 +23,24 @@ def seed_initial_master_data(target_db):
         {"title": "MASTER DISTRIBUTOR", "code": "MD", "parent": 1, "active": True},
         {"title": "DISTRIBUTOR", "code": "DT", "parent": 2, "active": False},
     ]
-    for lvl in levels:
-        HierarchyLevel.objects.using(target_db).update_or_create(
-            title=lvl["title"],
+
+    for item in levels:
+        HierarchyLevel.objects.using(db_name).update_or_create(
+            title=item["title"],
             defaults={
-                "description": lvl["title"],
-                "prefix": lvl["code"],
-                "parent_id": lvl["parent"],
-                "is_active": lvl["active"]
+                "description": item["title"],
+                "prefix": item["code"],
+                "parent_id": item["parent"],
+                "is_active": item["active"]
             }
         )
 
-    if not DefaultChargeHead.objects.exists():
-        charges = ['instant_transfer_fee', 'wallet_to_bank_fee', 'dmt_charges']
-        for name in charges:
-            DefaultChargeHead.objects.get_or_create(name=name)
+    default_charges = ['instant_transfer_fee', 'bank_transfer_fee']
+
+    for charge_name in default_charges:
+        SaOperatorCharge.objects.get_or_create(
+            name=charge_name,
+            defaults={'is_active': True}
+        )
+
+    print(f"Seed data successfully added in database: {db_name}")

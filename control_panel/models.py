@@ -28,6 +28,48 @@ class GSTCode(models.Model):
         return f"GST {self.gst_code} ({self.cgst}%)"
     
     
+class SmtpEmail(models.Model):
+    service_type = models.CharField(max_length=100, unique=True, default="SUPERADMIN")
+    smtp_server = models.CharField(max_length=255)
+    smtp_port = models.IntegerField()
+    encryption = models.CharField(max_length=10, choices=[('SSL', 'SSL'), ('TLS', 'TLS')])
+    sender_email = models.EmailField()
+    sender_password = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "superadmin_smtp_mail"
+        verbose_name = "SMTP Configuration"
+
+    def __str__(self):
+        return f"{self.service_type} - {self.sender_email}"
+    
+
+
+class SMSAccount(models.Model):
+    sms_id = models.AutoField(primary_key=True)
+    api_key = models.CharField(max_length=300, blank=True)
+    sender = models.CharField(max_length=50, blank=True)
+    action = models.CharField(max_length=100, blank=True)
+    action_id = models.IntegerField(null=True, blank=True)
+    pe_id = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'sms_credentials'
+
+
+class SMSTemplate(models.Model):
+    template_id = models.AutoField(primary_key=True)
+    te_id = models.CharField(max_length=100, blank=True)
+    credentials = models.ForeignKey(SMSAccount, on_delete=models.CASCADE)
+    message = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'sms_templates'
+
 
 
 class Region(models.Model): 
@@ -398,21 +440,9 @@ class DepositBankAccount(models.Model):
     is_enabled = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
     added_at = models.DateTimeField(auto_now_add=True)
-    added_by = models.ForeignKey(
-        PortalUser,
-        on_delete=models.PROTECT,
-        related_name='deposit_banks_created',
-        null=True,
-        blank=True
-    )
+    added_by = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='deposit_banks_created',null=True,blank=True)
     modified_at = models.DateTimeField(auto_now=True)
-    modified_by = models.ForeignKey(
-        PortalUser,
-        on_delete=models.SET_NULL,
-        related_name='deposit_banks_updated',
-        null=True,
-        blank=True
-    )
+    modified_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,related_name='deposit_banks_updated',null=True,blank=True)
 
     class Meta:
         db_table = 'config_deposit_banks'
@@ -441,63 +471,22 @@ class TransactionMode(models.TextChoices):
 
 class FundDepositRequest(models.Model):
     request_ref = models.AutoField(primary_key=True)
-    
-    deposit_methods = models.JSONField(
-        default=list,
-        help_text="Which methods used: ['UPI', 'Cash Deposit']"
-    )
-    
-    linked_bank = models.ForeignKey(
-        DepositBankAccount,
-        on_delete=models.PROTECT,
-        related_name='deposit_requests'
-    )
-    
+    deposit_methods = models.JSONField(default=list)
+    linked_bank = models.ForeignKey(DepositBankAccount,on_delete=models.PROTECT,related_name='deposit_requests')
     deposit_amount = models.DecimalField(max_digits=15, decimal_places=2)
     reference_id = models.CharField(max_length=100, unique=True, blank=True, null=True)
     utr_ref = models.CharField(max_length=50, unique=True, blank=True, null=True, db_index=True)
-    
-    transfer_mode = models.CharField(
-        max_length=20,
-        choices=TransactionMode.choices,
-        blank=True,
-        null=True
-    )
-    
-    proof_documents = models.JSONField(
-        default=list,
-        help_text="List of uploaded proof URLs or file keys"
-    )
-    
+    transfer_mode = models.CharField(max_length=20,choices=TransactionMode.choices,blank=True,null=True)
+    proof_documents = models.JSONField(default=list)
     user_remarks = models.TextField(blank=True, null=True)
     admin_reasons = models.TextField(blank=True, null=True)
-
-    status = models.CharField(
-    max_length=20,
-    choices=FundRequestStatus.choices,
-    default=FundRequestStatus.PENDING
-    )
-
-
+    status = models.CharField(max_length=20,choices=FundRequestStatus.choices,default=FundRequestStatus.PENDING)
     is_void = models.BooleanField(default=False)
     is_removed = models.BooleanField(default=False)
-
     submitted_at = models.DateTimeField(auto_now_add=True)
-    submitted_by = models.ForeignKey(
-        PortalUser,
-        on_delete=models.PROTECT,
-        related_name='fund_requests_made',
-        null=True,
-        blank=True
-    )
+    submitted_by = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='fund_requests_made',null=True,blank=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
-    reviewed_by = models.ForeignKey(
-        PortalUser,
-        on_delete=models.SET_NULL,
-        related_name='fund_requests_reviewed',
-        null=True,
-        blank=True
-    )
+    reviewed_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,related_name='fund_requests_reviewed',null=True,blank=True)
 
     class Meta:
         db_table = 'txn_fund_deposit_requests'
@@ -514,28 +503,16 @@ class FundDepositRequest(models.Model):
 
 #useractivity
 
-from django.db import models
-
 class MemberActionLog(models.Model):
-    log_id = models.AutoField(primary_key=True)
-    
+    log_id = models.AutoField(primary_key=True)  
     record_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     module_name = models.CharField(max_length=100, db_index=True, null=True, blank=True)
-    
     action_type = models.CharField(max_length=80, db_index=True) 
     action_details = models.TextField(blank=True, null=True)
-    
     performed_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    performed_by = models.ForeignKey(PortalUser,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='action_logs'
-    )
-    
+    performed_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,null=True,blank=True,related_name='action_logs')
     request_payload = models.JSONField(null=True, blank=True)   
     response_payload = models.JSONField(null=True, blank=True)
-
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=255, null=True, blank=True)
 
@@ -558,30 +535,18 @@ TRANSACTION_NATURE = [
 
 class GlTrn(models.Model):
     entry_id = models.AutoField(primary_key=True)
-    
     linked_service_id = models.BigIntegerField(null=True, blank=True)
-    member = models.ForeignKey(
-       PortalUser,
-        on_delete=models.PROTECT, 
-        null=True, 
-        blank=True,
-        related_name='ledger_entries'
-    )
-
+    member = models.ForeignKey(PortalUser,on_delete=models.PROTECT,null=True,blank=True,related_name='ledger_entries')
     transaction_type = models.CharField(max_length=100, blank=True) 
     amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
-    
     tds_percent = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal('0.0000'))
     gst_percent = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal('0.0000'))
     tds_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-
     source_table = models.CharField(max_length=100, blank=True)  
     wallet_type = models.CharField(max_length=30, blank=True)    
-    
     final_amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
     entry_nature = models.CharField(max_length=6, choices=TRANSACTION_NATURE) 
-
     transaction_time = models.DateTimeField(null=True, blank=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
 
@@ -595,23 +560,14 @@ class GlTrn(models.Model):
 
 class WalletHistory(models.Model):
     history_id = models.AutoField(primary_key=True)
-    
     reference_id = models.BigIntegerField(null=True, blank=True)   
     action_name = models.CharField(max_length=150)                 
-
-    user = models.ForeignKey(
-        PortalUser,
-        on_delete=models.PROTECT,
-        related_name='wallet_history'
-    )
-
+    user = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='wallet_history')
     wallet_name = models.CharField(max_length=50)                 
     changed_amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
     change_type = models.CharField(max_length=6, choices=TRANSACTION_NATURE)  
-
     balance_after = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
     remarks = models.CharField(max_length=500, blank=True)
-
     transaction_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -651,38 +607,14 @@ class AdditionalFee(models.Model):
     
 
 class PortalUserBalance(models.Model):
-    """Stores multiple wallet balances for each portal user"""
-    
     balance_id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField(
-        PortalUser,
-        on_delete=models.PROTECT,
-        related_name='wallet_account',
-        db_column='portal_user_id',
-        null=True,
-        blank=True
-    )
-    
-    primary_balance = models.DecimalField(
-        max_digits=20, decimal_places=3, default=0.000, help_text="Main usable wallet"
-    )
-    earnings_balance = models.DecimalField(
-        max_digits=20, decimal_places=3, default=0.000, help_text="Commission / Referral earnings"
-    )
-
-    deposit_balance = models.DecimalField(
-        max_digits=20, decimal_places=3, default=0.000, null=True, blank=True
-    )
-    gateway_balance = models.DecimalField(
-        max_digits=20, decimal_places=3, default=0.000, null=True, blank=True
-    )
-    outstanding_balance = models.DecimalField(
-        max_digits=20, decimal_places=3, default=0.000, null=True, blank=True
-    )
-    hold_balance = models.DecimalField(
-        max_digits=20, decimal_places=3, default=0.000, null=True, blank=True, help_text="Lien / Frozen amount"
-    )
-
+    user = models.OneToOneField(PortalUser,on_delete=models.PROTECT,related_name='wallet_account',db_column='portal_user_id',null=True,blank=True)
+    primary_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000)
+    earnings_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000)
+    deposit_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000, null=True, blank=True)
+    gateway_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000, null=True, blank=True)
+    outstanding_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000, null=True, blank=True)
+    hold_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000, null=True, blank=True, help_text="Lien / Frozen amount")
     created_on = models.DateTimeField(auto_now_add=True)
     last_updated_on = models.DateTimeField(null=True, blank=True)
     last_updated_by = models.PositiveIntegerField(null=True, blank=True)
@@ -699,7 +631,6 @@ class PortalUserBalance(models.Model):
         return f"Wallet #{self.balance_id} - {self.user.get_full_name() or self.user.username or 'N/A'}"
 
     def total_available(self):
-        """Helper to calculate total usable balance"""
         return (
             self.primary_balance +
             self.earnings_balance +
@@ -717,37 +648,18 @@ class ChargeRule(models.Model):
     TYPE_CHOICES = (('CREDIT', 'Credit'), ('DEBIT', 'Debit'))
     RATE_MODE_CHOICES = (('FLAT', 'Flat Amount'), ('PERCENT', 'Percentage'))
     CATEGORY_CHOICES = (('OUR_SHARE', 'Our Share'), ('admin_SHARE', 'admin Share'))
-
     rule_id = models.AutoField(primary_key=True)
-
-    service_provider = models.ForeignKey(
-        'ServiceProvider',
-        on_delete=models.CASCADE,
-        related_name='charge_rules'
-    )
-
+    service_provider = models.ForeignKey(ServiceProvider,on_delete=models.CASCADE,related_name='charge_rules')
     charge_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     rate_mode = models.CharField(max_length=15, choices=RATE_MODE_CHOICES)
-    
     min_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     max_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     rate_value = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    
     linked_identifier = models.PositiveIntegerField(null=True, blank=True, help_text="e.g., Operator ID, Biller ID")
-    
-    charge_beneficiary = models.CharField(
-        max_length=20,
-        choices=CATEGORY_CHOICES,
-        default='OUR_SHARE'
-    )
-
+    charge_beneficiary = models.CharField(max_length=20,choices=CATEGORY_CHOICES,default='OUR_SHARE')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
-    updated_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True,
-        related_name='modified_charge_rules'
-    )
-    
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL,null=True,related_name='modified_charge_rules')
     is_disabled = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
 
@@ -762,6 +674,31 @@ class ChargeRule(models.Model):
         return f"Rule {self.rule_id} | {self.service_provider.label} | {self.get_charge_type_display()} | {self.rate_value or 0}"
     
     
+class SaBillerGroup(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100)
+    is_deleted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'global_biller_groups'
+
+
+class SaGlobalOperator(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=20, unique=True)
+    operator_type = models.CharField(max_length=50, blank=True)
+    is_deleted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+    class Meta:
+        db_table = 'global_operators'
 
 
 class SaAdditionalCharges(models.Model):

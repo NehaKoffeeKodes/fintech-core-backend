@@ -74,16 +74,16 @@ class ServiceRoutingControlView(APIView):
             new_order_ids = request.data.get('order_ids')  
 
             if not service_key:
-                return Response({"success": False, "message": "service_key required"}, status=400)
+                return Response({"success": False, "message": "service_key required"}, status=status.HTTP_400_BAD_REQUEST)
             if not new_order_ids:
-                return Response({"success": False, "message": "order_ids required"}, status=400)
+                return Response({"success": False, "message": "order_ids required"}, status=status.HTTP_400_BAD_REQUEST)
 
             if isinstance(new_order_ids, str):
                 new_order_ids = [int(x.strip()) for x in new_order_ids.split(',') if x.strip().isdigit()]
             elif isinstance(new_order_ids, list):
                 new_order_ids = [int(x) for x in new_order_ids if isinstance(x, (int, str)) and str(x).isdigit()]
             else:
-                return Response({"success": False, "message": "Invalid order_ids format"}, status=400)
+                return Response({"success": False, "message": "Invalid order_ids format"}, status=status.HTTP_400_BAD_REQUEST)
 
             service = SaCoreService.objects.get(service_key=service_key)
             current_routing = service.routing_order or []
@@ -111,7 +111,7 @@ class ServiceRoutingControlView(APIView):
             }, status=status.HTTP_200_OK)
 
         except SaCoreService.DoesNotExist:
-            return Response({"success": False, "message": "Service not found"}, status=404)
+            return Response({"success": False, "message": "Service not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({
                 "success": False,

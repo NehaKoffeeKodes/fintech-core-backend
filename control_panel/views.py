@@ -27,16 +27,17 @@ from web_portal.serializers import *
 from admin_hub.models import *
 import csv
 from io import StringIO
-
-
+import ast
+from dotenv import load_dotenv, set_key
+import math,base64
+from django.utils.html import strip_tags
+from django.utils.crypto import get_random_string
+from admin_hub.models import*
+from control_panel import apps
 
 logger = logging.getLogger(__name__)
 
 def store_uploaded_document(file_obj, sub_folder: str = "documents"):
-    """
-    Securely save uploaded file and return relative URL path
-    Same logic as handle_uploaded_file but completely different style
-    """
     if not file_obj:
         return None
     

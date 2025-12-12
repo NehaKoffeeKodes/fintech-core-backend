@@ -12,6 +12,8 @@ from control_panel.APIs.Admin_Info.fund_request import*
 from control_panel.APIs.Admin_Info.gst_tax_verification import*
 from control_panel.APIs.Admin_Info.s_admin_other_charges import *
 from control_panel.APIs.Admin_Info.required_documents_list import *
+from control_panel.send_otp import SendOTPEmailAPI
+
 
 urlpatterns = [
     #HSNSAC
@@ -51,5 +53,6 @@ urlpatterns = [
     #REQUIRED_DOCUMENT_LIST
     path('manage-document/',ManageDocumentTemplatesView.as_view()),
     
-    
+    #send-otp
+    path('api/send-otp-email/', SendOTPEmailAPI.as_view(), name='send-otp-email'),
 ]

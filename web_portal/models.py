@@ -35,24 +35,6 @@ class AdminAccount(AbstractUser):
         return f"{self.first_name} {self.last_name}".strip()
 
 
-
-class SmtpEmail(models.Model):
-    service_type = models.CharField(max_length=100, unique=True, default="SUPERADMIN")
-    smtp_server = models.CharField(max_length=255)
-    smtp_port = models.IntegerField()
-    encryption = models.CharField(max_length=10, choices=[('SSL', 'SSL'), ('TLS', 'TLS')])
-    sender_email = models.EmailField()
-    sender_password = models.CharField(max_length=255)
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        db_table = "superadmin_smtp_mail"
-        verbose_name = "SMTP Configuration"
-
-    def __str__(self):
-        return f"{self.service_type} - {self.sender_email}"
-
-
 class AdminActivityLog(models.Model):
     user = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
     action = models.CharField(max_length=100, db_index=True)
@@ -115,12 +97,9 @@ class Aboutus(models.Model):
     core_values = models.TextField(blank=True, null=True)
     leadership_message = models.TextField(blank=True, null=True)
     future_goals = models.TextField(blank=True, null=True)
-    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True)
-    created_by = models.ForeignKey(
-        AdminAccount, on_delete=models.PROTECT, related_name='company_overviews'
-    )
+    created_by = models.ForeignKey(AdminAccount, on_delete=models.PROTECT, related_name='company_overviews')
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -250,9 +229,7 @@ class NewsUpdateRecord(models.Model):
     full_name = models.CharField(max_length=200, blank=True, null=True)
     subscriber_email = models.EmailField(max_length=254, unique=True)
     joined_on = models.DateTimeField(auto_now_add=True)
-    modified_by = models.ForeignKey(
-        AdminAccount, on_delete=models.SET_NULL, null=True, blank=True
-    )
+    modified_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True, blank=True)
     is_suspended = models.BooleanField(default=False)
     is_removed = models.BooleanField(default=False)
 
@@ -286,7 +263,7 @@ class Sponsor(models.Model):
     is_archived = models.BooleanField(default=False)
     added_on = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(null=True, blank=True)
-    added_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='added_sponsors')
+    added_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,blank=True,related_name='added_sponsors')
 
     def __str__(self):
         return self.title
@@ -303,7 +280,7 @@ class SiteConfig(models.Model):
     shipping_policy_text = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='site_settings_created')
+    created_by = models.ForeignKey(AdminAccount,on_delete=models.PROTECT,related_name='site_settings_created')
 
     class Meta:
         db_table = 'core_site_configuration'

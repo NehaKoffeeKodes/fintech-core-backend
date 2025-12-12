@@ -3,7 +3,6 @@ from .models import*
 
 # Register your models here.
 admin.site.register(AdminAccount)
-admin.site.register(SmtpEmail)
 admin.site.register(AdminActivityLog)
 admin.site.register(Superadminlogindetails)
 admin.site.register(Adminbanner)

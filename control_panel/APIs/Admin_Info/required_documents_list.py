@@ -2,7 +2,7 @@ from ...views import *
 
 class ManageDocumentTemplatesView(APIView):
     authentication_classes = [SecureJWTAuthentication]
-    # permission_classes = [IsSuperAdmin | IsAdmin]
+    permission_classes = [IsSuperAdmin | IsAdmin]
 
     def post(self, request):
         if request.data.get('page_number') or request.data.get('page_size'):
@@ -48,14 +48,14 @@ class ManageDocumentTemplatesView(APIView):
             with transaction.atomic():
                 template_id = request.data.get('template_id')
                 if not template_id:
-                    return Response({"success": False, "message": "template_id required"}, status=400)
+                    return Response({"success": False, "message": "template_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
                 template = DocumentTemplate.objects.filter(
                     template_id=template_id, soft_deleted=False
                 ).first()
 
                 if not template:
-                    return Response({"success": False, "message": "Template not found"}, status=404)
+                    return Response({"success": False, "message": "Template not found"}, status=status.HTTP_404_NOT_FOUND)
 
                 serializer = DocumentTemplateSerializer(template, data=request.data, partial=True)
                 if serializer.is_valid():
@@ -72,27 +72,27 @@ class ManageDocumentTemplatesView(APIView):
                     return Response({
                         "success": True,
                         "message": "Template updated successfully"
-                    }, status=200)
+                    }, status=status.HTTP_200_OK)
 
                 errors = [str(e) for e in serializer.errors.values()]
-                return Response({"success": False, "message": " ".join(errors)}, status=400)
+                return Response({"success": False, "message": " ".join(errors)}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            return Response({"success": False, "message": str(e)}, status=500)
+            return Response({"success": False, "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):
         try:
             with transaction.atomic():
                 template_id = request.data.get('template_id')
                 if not template_id:
-                    return Response({"success": False, "message": "template_id required"}, status=400)
+                    return Response({"success": False, "message": "template_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
                 template = DocumentTemplate.objects.filter(
                     template_id=template_id, soft_deleted=False
                 ).first()
 
                 if not template:
-                    return Response({"success": False, "message": "Template not found or already deleted"}, status=404)
+                    return Response({"success": False, "message": "Template not found or already deleted"}, status=status.HTTP_404_NOT_FOUND)
 
                 template.soft_deleted = True
                 template.active = False
@@ -109,10 +109,10 @@ class ManageDocumentTemplatesView(APIView):
                 return Response({
                     "success": True,
                     "message": "Template removed successfully"
-                }, status=200)
+                }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"success": False, "message": str(e)}, status=500)
+            return Response({"success": False, "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def list_templates(self, request):
         try:
@@ -122,7 +122,7 @@ class ManageDocumentTemplatesView(APIView):
             template_id = request.data.get('template_id')
 
             if page < 1 or size < 1:
-                return Response({"success": False, "message": "Invalid pagination"}, status=400)
+                return Response({"success": False, "message": "Invalid pagination"}, status=status.HTTP_400_BAD_REQUEST)
 
             queryset = DocumentTemplate.objects.filter(soft_deleted=False, active=True)
 
@@ -141,7 +141,7 @@ class ManageDocumentTemplatesView(APIView):
                     "success": True,
                     "message": "No templates found",
                     "data": {"total": 0, "results": []}
-                }, status=200)
+                }, status=status.HTTP_200_OK)
 
             paginator = Paginator(queryset.order_by('-template_id'), size)
             try:
@@ -160,7 +160,7 @@ class ManageDocumentTemplatesView(APIView):
                     "page_size": size,
                     "results": serializer.data
                 }
-            }, status=200)
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"success": False, "message": str(e)}, status=500)
+            return Response({"success": False, "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

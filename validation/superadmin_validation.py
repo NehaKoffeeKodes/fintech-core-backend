@@ -48,7 +48,12 @@ def is_float(value):
     except:
         return False
     
-    
+def is_valid_ifsc(code):
+    if not code or len(code) != 11:
+        return False
+    pattern = r'^[A-Z]{4}0[A-Z0-9]{6}$'
+    return bool(re.match(pattern, code.upper()))
+   
 
 #string validation
 

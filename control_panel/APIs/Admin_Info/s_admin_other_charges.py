@@ -63,7 +63,7 @@ class SaManageChargesView(APIView):
 
            
             if not fee_id:
-                return Response({"success": False, "message": "fee_id is required"}, status=400)
+                return Response({"success": False, "message": "fee_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
             fee = AdditionalFee.objects.get(fee_id=fee_id, is_removed=False)
 
@@ -95,9 +95,9 @@ class SaManageChargesView(APIView):
             }, status=status.HTTP_200_OK)
 
         except AdditionalFee.DoesNotExist:
-            return Response({"success": False, "message": "Charge not found"}, status=404)
+            return Response({"success": False, "message": "Charge not found"}, status=status.HTTP_404_NOT_FOUND)
         except GSTCode.DoesNotExist:
-            return Response({"success": False, "message": "Invalid tax code"}, status=404)
+            return Response({"success": False, "message": "Invalid tax code"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({
                 "success": False,
@@ -109,7 +109,7 @@ class SaManageChargesView(APIView):
         try:
             fee_id = request.data.get('fee_id')
             if not fee_id:
-                return Response({"success": False, "message": "fee_id required"}, status=400)
+                return Response({"success": False, "message": "fee_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
             charge = AdditionalFee.objects.get(fee_id=fee_id, is_removed=False)
             print('charge:',charge)
@@ -122,7 +122,7 @@ class SaManageChargesView(APIView):
             }, status=status.HTTP_200_OK)
 
         except AdditionalFee.DoesNotExist:
-            return Response({"success": False, "message": "Charge not found"}, status=404)
+            return Response({"success": False, "message": "Charge not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({
                 "success": False,

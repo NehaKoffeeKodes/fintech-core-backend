@@ -244,7 +244,55 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
 
         return data
     
+    
+    
+class SmtpEmailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SmtpEmail
+        fields = [
+            'id', 'service_type', 'smtp_server', 'smtp_port', 'encryption',
+            'sender_email', 'sender_password', 'is_active'
+        ]
+        read_only_fields = ('id',)
+        extra_kwargs = {
+            'sender_password': {'write_only': True},  
+        }
 
+    def validate_smtp_port(self, value):
+        if value is None:
+            raise serializers.ValidationError("SMTP port is required.")
+        if not (1 <= value <= 65535):
+            raise serializers.ValidationError("Port must be between 1 and 65535.")
+        return value
+
+    def validate_encryption(self, value):
+        if value not in ['SSL', 'TLS']:
+            raise serializers.ValidationError("Encryption must be either 'SSL' or 'TLS'.")
+        return value
+
+    def validate(self, data):
+        instance_exists = self.instance is not None
+        errors = {}
+
+        required = ['smtp_server', 'smtp_port', 'sender_email', 'sender_password', 'encryption']
+
+        for field in required:
+            value = data.get(field)
+            old_value = getattr(self.instance, field, None) if instance_exists else None
+
+            if (not instance_exists and value in [None, '']) or \
+               (instance_exists and field in data and value in [None, '']):
+                errors[field] = f"{field.replace('_', ' ').title()} is required."
+
+        if 'smtp_port' in data and (data['smtp_port'] < 1 or data['smtp_port'] > 65535):
+            errors['smtp_port'] = "Invalid port range."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return data
+    
+    
 
 class SaCoreServiceSerializer(serializers.ModelSerializer):
     service_status = serializers.SerializerMethodField()

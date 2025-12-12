@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'web_portal',
     'rest_framework',
     'rest_framework_simplejwt',
+    'admin_hub',
 ]
 
 MIDDLEWARE = [

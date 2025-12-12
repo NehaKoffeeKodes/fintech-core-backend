@@ -48,9 +48,9 @@ class SuperAdminManageView(APIView):
             phone = payload["contact_number"].strip()
 
             if not validate_email_format(email):
-                return Response({"status": "fail", "message": "Please enter a valid email"}, status=400)
+                return Response({"status": "fail", "message": "Please enter a valid email"}, status=status.HTTP_400_BAD_REQUEST)
             if not validate_phone_format(phone):
-                return Response({"status": "fail", "message": "Please enter a valid phone number"}, status=400)
+                return Response({"status": "fail", "message": "Please enter a valid phone number"}, status=status.HTTP_400_BAD_REQUEST)
 
             if AdminAccount.objects.filter(email=email, is_deleted=False).exists():
                 return Response({"status": "fail", "message": "This email is already registered"}, status=409)
@@ -84,7 +84,7 @@ class SuperAdminManageView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as exc:
-            return Response({"status": "error", "message": "Something went wrong"}, status=500)
+            return Response({"status": "error", "message": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _handle_list(self, request):
         try:
@@ -127,15 +127,15 @@ class SuperAdminManageView(APIView):
             }, status=status.HTTP_200_OK)
 
         except ValueError:
-            return Response({"status": "fail", "message": "Invalid page or size value"}, status=400)
+            return Response({"status": "fail", "message": "Invalid page or size value"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
-            return Response({"status": "error", "message": "Failed to load data"}, status=500)
+            return Response({"status": "error", "message": "Failed to load data"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _handle_update(self, request):
         try:
             admin_id = request.data.get("admin_id")
             if not admin_id:
-                return Response({"status": "fail", "message": "admin_id is required"}, status=400)
+                return Response({"status": "fail", "message": "admin_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
             admin = AdminAccount.objects.get(id=admin_id, is_superuser=True, is_deleted=False)
 
@@ -171,21 +171,21 @@ class SuperAdminManageView(APIView):
             return Response({
                 "status": "success",
                 "message": "SuperAdmin profile updated successfully"
-            }, status=200)
+            }, status=status.HTTP_200_OK)
 
         except AdminAccount.DoesNotExist:
             return Response({"status": "fail", "message": "SuperAdmin not found"}, status=404)
         except Exception as exc:
-            return Response({"status": "error", "message": "Update failed"}, status=500)
+            return Response({"status": "error", "message": "Update failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _handle_delete(self, request):
         try:
             admin_id = request.data.get("admin_id")
             if not admin_id:
-                return Response({"status": "fail", "message": "admin_id is required"}, status=400)
+                return Response({"status": "fail", "message": "admin_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
             if str(admin_id) == str(request.user.id):
-                return Response({"status": "fail", "message": "You cannot delete your own account"}, status=403)
+                return Response({"status": "fail", "message": "You cannot delete your own account"}, status=status.HTTP_403_FORBIDDEN)
 
             admin = AdminAccount.objects.get(id=admin_id, is_superuser=True, is_deleted=False)
             admin.is_deleted = True
@@ -195,9 +195,9 @@ class SuperAdminManageView(APIView):
             return Response({
                 "status": "success",
                 "message": "SuperAdmin account removed successfully"
-            }, status=200)
+            }, status=status.HTTP_200_OK)
 
         except AdminAccount.DoesNotExist:
             return Response({"status": "fail", "message": "SuperAdmin not found"}, status=404)
         except Exception as exc:
-            return Response({"status": "error", "message": "Deletion failed"}, status=500)
+            return Response({"status": "error", "message": "Deletion failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

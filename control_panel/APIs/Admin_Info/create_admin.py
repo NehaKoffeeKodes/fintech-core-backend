@@ -6,7 +6,6 @@ from ...views import *
 
 
 def build_error_response(errors):
-    """Helper to convert serializer errors into clean string"""
     if isinstance(errors, dict):
         return " | ".join([f"{k}: {', '.join(v)}" for k, v in errors.items()])
     return str(errors)
@@ -168,7 +167,7 @@ class AdminManagementAPIView(APIView):
             })
 
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request):
         try:
@@ -180,10 +179,10 @@ class AdminManagementAPIView(APIView):
                 else:
                     return self.update_admin_profile(request)
 
-            return Response({"status": "error", "message": "Invalid update request"}, status=400)
+            return Response({"status": "error", "message": "Invalid update request"}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def update_admin_status(self, request):
         admin_id = request.data.get('admin_id')
@@ -215,7 +214,7 @@ class AdminManagementAPIView(APIView):
             })
 
         except ServiceProvider.DoesNotExist:
-            return Response({"status": "fail", "message": "admin not found"}, status=404)
+            return Response({"status": "fail", "message": "admin not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def update_admin_profile(self, request):
         try:
@@ -224,7 +223,7 @@ class AdminManagementAPIView(APIView):
                 admin = ServiceProvider.objects.get(pk=admin_id).first()
 
                 if not admin:
-                    return Response({"status": "fail", "message": "admin not found"}, status=404)
+                    return Response({"status": "fail", "message": "admin not found"}, status=status.HTTP_404_NOT_FOUND)
 
                 if any(f in request.FILES for f in ['pan_copy', 'aadhaar_front', 'gst_certificate']):
                     paths = self._handle_document_uploads(request.data, 'updated_docs/')
@@ -243,13 +242,13 @@ class AdminManagementAPIView(APIView):
                 })
 
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):
         try:
             admin_id = request.data.get('admin_id')
             if not admin_id:
-                return Response({"status": "fail", "message": "admin_id required"}, status=400)
+                return Response({"status": "fail", "message": "admin_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
             admin = ServiceProvider.objects.get(pk=admin_id)
             admin.is_active = not admin.is_active
@@ -272,9 +271,9 @@ class AdminManagementAPIView(APIView):
             })
 
         except ServiceProvider.DoesNotExist:
-            return Response({"status": "fail", "message": "admin not found"}, status=404)
+            return Response({"status": "fail", "message": "admin not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _handle_document_uploads(self, data, folder):
         uploads = {}
