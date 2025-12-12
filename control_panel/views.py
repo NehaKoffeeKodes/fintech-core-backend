@@ -11,7 +11,8 @@ from control_panel.models import *
 from validation.superadmin_validation import*
 from datetime import timezone
 from web_portal.models import *
-from fintech_backend.customjwt_auth import*
+from authentication.customjwt_auth import *
+from authentication.permissions import *
 import logging
 from utils.Api.core_utils import*
 import json

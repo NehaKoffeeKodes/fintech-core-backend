@@ -9,7 +9,8 @@ from jwt import encode, decode, ExpiredSignatureError, InvalidTokenError
 from django.conf import settings
 
 from web_portal.models import *
-from fintech_backend.customjwt_auth import *
+from authentication.customjwt_auth import *
+from authentication.permissions import*
 from utils.sa_notification.notify_service import *
 from django.contrib.auth.hashers import check_password, make_password
 from .serializers import *
