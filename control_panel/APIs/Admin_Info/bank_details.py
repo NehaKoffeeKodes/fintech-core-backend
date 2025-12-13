@@ -17,7 +17,7 @@ class ManageDepositBanksAPIView(APIView):
 
         return Response(
             {"error": True, "message": "Invalid action. Use proper fields."},
-            status=status.HTTP_status.HTTP_400_BAD_REQUEST_BAD_REQUEST
+            status=status.HTTP_400_BAD_REQUEST
         )
 
     def create_bank_account(self, request):
@@ -75,6 +75,7 @@ class ManageDepositBanksAPIView(APIView):
             ).exists():
                 return Response({"error": True, "message": "Bank with this IFSC & Account already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
+            user = AdminAccount.objects.get(id=request.user.id)
             DepositBankAccount.objects.create(
                 enabled_channels=channels if isinstance(channels, list) else json.loads(channels),
                 bank_title=bank_title,
@@ -84,10 +85,12 @@ class ManageDepositBanksAPIView(APIView):
                 account_number=acc_no,
                 account_kind=acc_kind,
                 digital_transfer_fees=online_fees,
-                cdm_deposit_machine_fees=cdm_fees,
+                cdm_deposit_fees=cdm_fees,   
                 branch_counter_fees=counter_fees,
-                added_by=request.user
+                added_by=user
             )
+
+
 
             return Response({
                 "success": True,
@@ -126,13 +129,20 @@ class ManageDepositBanksAPIView(APIView):
 
             channel = request.query_params.get('channel')
             if channel:
-                queryset = [b for b in queryset if b.enabled_channels.get(channel, False)]
+                queryset = queryset.filter(enabled_channels__contains={channel: True})
 
             bank_id = request.query_params.get('bank_id')
             if bank_id:
                 try:
                     bank = queryset.get(account_id=bank_id)
-                    active_channels = {k: v for k, v in bank.enabled_channels.items() if v}
+                    enabled_channels = bank.enabled_channels
+                    if isinstance(enabled_channels, list):
+                        active_channels = {channel: True for channel in enabled_channels}
+                    elif isinstance(enabled_channels, dict):
+                        active_channels = {k: v for k, v in enabled_channels.items() if v}
+                    else:
+                        active_channels = {}
+
                     return Response({
                         "success": True,
                         "data": {
@@ -156,12 +166,21 @@ class ManageDepositBanksAPIView(APIView):
             paginator = Paginator(queryset, size)
             if page > paginator.num_pages:
                 page = paginator.num_pages
+            if page < 1:
+                page = 1
 
-            page_obj = paginator.get_page(page)
+            page_obj = paginator.page(page)
 
             results = []
             for bank in page_obj:
-                active = {k: v for k, v in bank.enabled_channels.items() if v}
+                enabled_channels = bank.enabled_channels
+                if isinstance(enabled_channels, list):
+                    active = {channel: True for channel in enabled_channels}
+                elif isinstance(enabled_channels, dict):
+                    active = {k: v for k, v in enabled_channels.items() if v}
+                else:
+                    active = {}
+
                 results.append({
                     "bank_id": bank.account_id,
                     "enabled_channels": active,
@@ -185,8 +204,11 @@ class ManageDepositBanksAPIView(APIView):
                 }
             })
 
+        except ValueError as ve:
+            logger.error(f"List banks pagination error: {ve}")
+            return Response({"error": True, "message": "Invalid page or size."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"List banks error: {e}")
+            logger.error(f"List banks error: {e}", exc_info=True)
             return Response({"error": True, "message": "Server error."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):

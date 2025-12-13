@@ -79,27 +79,31 @@ class AdminSerializer(serializers.ModelSerializer):
         instance = self.instance
         is_create = not bool(instance)
 
-        mandatory = ['business_name', 'mobile', 'email_id', 'firm_name', 'state', 'district', 'pin_code']
+        mandatory = ['entity_name', 'mobile', 'email', 'company_title', 'pin_code']
         errors = {}
 
         if is_create:
             for field in mandatory:
                 if not attrs.get(field):
-                    errors[field] = f"{field.replace('_', ' ').title()} is mandatory."
-        else:
-            for field in mandatory:
-                if field in attrs and not attrs[field]:
-                    errors[field] = f"{field.replace('_', ' ').title()} cannot be empty."
+                    nice_name = field.replace('_', ' ').title()
+                    errors[field] = f"{nice_name} is mandatory."
 
-        if attrs.get('pan_number') and len(attrs['pan_number']) != 10:
-            errors['pan_number'] = "PAN must be exactly 10 characters."
+        if is_create:
+            if not attrs.get('registered_state'):
+                errors['registered_state'] = "Registered State is mandatory."
+            if not attrs.get('registered_city'):
+                errors['registered_city'] = "Registered City is mandatory."
 
-        if attrs.get('aadhaar_number') and len(attrs['aadhaar_number']) != 12:
-            errors['aadhaar_number'] = "Aadhaar must be exactly 12 digits."
+        if attrs.get('pan') and len(attrs['pan']) != 10:
+            errors['pan'] = "PAN must be exactly 10 characters."
 
-        uploaded_file = attrs.get('logo_image')
-        if uploaded_file and uploaded_file.size > 15 * 1024 * 1024:
-            errors['logo_image'] = "Logo size should not exceed 15MB."
+        if attrs.get('aadhaar') and len(attrs['aadhaar']) != 12:
+            errors['aadhaar'] = "Aadhaar must be exactly 12 digits."
+
+        for field in ['avatar', 'agreement_pdf']:
+            uploaded_file = attrs.get(field)
+            if uploaded_file and uploaded_file.size > 15 * 1024 * 1024:
+                errors[field] = f"{field.replace('_', ' ').title()} size should not exceed 15MB."
 
         if errors:
             raise serializers.ValidationError(errors)

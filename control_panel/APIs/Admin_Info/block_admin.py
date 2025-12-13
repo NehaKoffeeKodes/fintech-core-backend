@@ -4,25 +4,21 @@ logger = logging.getLogger(__name__)
 
 
 class AdminBlockView(APIView):
-    """
-    SuperAdmin use karta hai kisi client ko block/unblock karne ke liye
-    Ye toggle karta hai — block hai to unblock, unblock hai to block
-    """
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin]
 
     def patch(self, request):
-        client_admin_id = request.data.get('client_admin_id')
+        admin_id = request.data.get('admin_id')
 
-        if not client_admin_id:
+        if not admin_id:
             return Response({
                 'success': False,
-                'message': 'client_admin_id is required'
+                'message': 'admin_id is required'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             client_admin = Admin.objects.select_related().get(
-                client_admin_id=client_admin_id
+                admin_id=admin_id
             )
             
             if client_admin.status == 'PENDING':
@@ -81,8 +77,8 @@ class AdminBlockView(APIView):
             }, status=status.HTTP_424_FAILED_DEPENDENCY)
 
         except Exception as err:
-            logger.error(f"Client access toggle failed for ID {client_admin_id}: {str(err)}")
+            logger.error(f"Client access toggle failed for ID {admin_id}: {str(err)}", exc_info=True)
             return Response({
                 'success': False,
-                'message': 'Operation failed due to server error'
+                'message': f'Operation failed due to server error: {str(err)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

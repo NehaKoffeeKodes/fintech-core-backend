@@ -1,6 +1,7 @@
 from ...views import *
 
 
+
 class AdminSessionByPassView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin]
@@ -8,19 +9,31 @@ class AdminSessionByPassView(APIView):
     def post(self, request):
         client_code = request.data.get('client_code')
 
+        if not client_code:
+            return Response({
+                'success': False,
+                'message': 'client_code is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            client = Admin.objects.select_related().get(
-                client_code=client_code,
+            client = Admin.objects.get(
+                db_name=client_code,
                 is_active=True
             )
 
-            switch_to_database(client.database_alias)
-            portal_user = PortalUser.objects.using(client.database_alias).get(id=1)
-            temp_token = create_jwt_token(portal_user, minutes=10)
+            switch_to_database(client.db_name)
+
+            portal_user = PortalUser.objects.using(client.db_name).get(id=1)
+
+            temp_token = create_jwt_token(
+                portal_user,
+                access_token_lifetime_minutes=10,
+                db_name=client.db_name  
+            )
 
             response_data = {
                 'temp_access_token': str(temp_token),
-                'dashboard_url': client.portal_base_url,
+                'dashboard_url': f"https://{client_code}.yourdomain.com",  
                 'expires_in_minutes': 10
             }
 
@@ -28,6 +41,7 @@ class AdminSessionByPassView(APIView):
                 'success': True,
                 'message': 'Quick access link generated successfully',
                 'data': response_data
+                
             }, status=status.HTTP_200_OK)
 
         except Admin.DoesNotExist:
@@ -50,7 +64,6 @@ class AdminSessionByPassView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 class VerifySessionBypass(APIView):
     authentication_classes = []
     permission_classes = []
@@ -67,7 +80,15 @@ class VerifySessionBypass(APIView):
         try:
             payload = AccessToken(token)
             user_id = payload['user_id']
-            user = PortalUser.objects.get(id=user_id)
+            db_name = payload.get('db_name')
+
+            if not db_name:
+                raise ValueError("Database identifier missing from token")
+
+            switch_to_database(db_name)
+
+            user = PortalUser.objects.using(db_name).get(id=user_id)
+
             refresh = RefreshToken.for_user(user)
             refresh.set_exp(lifetime=timedelta(days=1))
 

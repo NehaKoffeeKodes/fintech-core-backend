@@ -50,9 +50,11 @@ class DashboardSummaryView(APIView):
             switch_to_database(admin.db_name)
 
             providers = AdServiceProvider.objects.filter(
-                Q(self_managed=True) | Q(sa_provided=True),
-                parent__isnull=True
+                self_managed=True,
+                is_active=True,
+                parent_provider__isnull=True
             )
+
 
             services_data = []
 
@@ -80,11 +82,12 @@ class DashboardSummaryView(APIView):
                 })
                 
             hierarchy = {
-                "super_distributors": PortalUserInfo.objects.filter(role='DISTRIBUTOR', hierarchy__code='SD').count(),
-                "master_distributors": PortalUserInfo.objects.filter(role='DISTRIBUTOR', hierarchy__code='MD').count(),
-                "distributors": PortalUserInfo.objects.filter(role='DISTRIBUTOR', hierarchy__code='DT').count(),
-                "retailers": PortalUserInfo.objects.filter(role='RETAILER').count(),
+                "super_distributors": PortalUserInfo.objects.filter(hierarchy_node_id=1, business_category='DISTRIBUTOR').count(),
+                "master_distributors": PortalUserInfo.objects.filter(hierarchy_node_id=2, business_category='DISTRIBUTOR').count(),
+                "distributors": PortalUserInfo.objects.filter(hierarchy_node_id=3, business_category='DISTRIBUTOR').count(),
+                "retailers": PortalUserInfo.objects.filter(business_category='RETAILER').count(),
             }
+
 
             return Response({
                 "status": "success",

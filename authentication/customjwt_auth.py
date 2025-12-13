@@ -19,7 +19,7 @@ def generate_jwt_token(user, expiry_minutes=None):
     return str(refresh.access_token)
 
 
-def create_jwt_token(user, access_token_lifetime_minutes=None):
+def create_jwt_token(user, access_token_lifetime_minutes=None, db_name=None):
     try:
         role_map = {
             "ADMIN": "ADMIN",
@@ -32,9 +32,13 @@ def create_jwt_token(user, access_token_lifetime_minutes=None):
 
     refresh_token = RefreshToken.for_user(user)
     refresh_token["role"] = user_role
-    refresh_token["username"] = getattr(user, 'username', 'unknown')
-    refresh_token["user_id"] = user.id
-    refresh_token["full_name"] = user.get_full_name() if hasattr(user, 'get_full_name') else ""
+    refresh_token["username"] = getattr(user, 'email_address', 'unknown')
+    refresh_token["user_id"] = user.pk
+    refresh_token["full_name"] = getattr(user, 'full_name', '')
+
+    # ADD THIS: Include db_name in payload
+    if db_name:
+        refresh_token["db_name"] = db_name
 
     if access_token_lifetime_minutes:
         refresh_token.access_token.set_exp(
@@ -42,7 +46,6 @@ def create_jwt_token(user, access_token_lifetime_minutes=None):
         )
 
     return str(refresh_token.access_token)
-
 
 
 

@@ -21,7 +21,7 @@ class ManageDocumentTemplatesView(APIView):
                         user=request.user,
                         action="CREATE",
                         entity="DocumentTemplate",
-                        entity_id=template.template_id,
+                        admin_id=template.template_id,
                         description=f"Created document: {template.display_name}",
                         ip_address=request.META.get('REMOTE_ADDR')
                     )
@@ -65,7 +65,7 @@ class ManageDocumentTemplatesView(APIView):
                         user=request.user,
                         action="UPDATE",
                         entity="DocumentTemplate",
-                        entity_id=updated_template.template_id,
+                        admin_id=updated_template.template_id,
                         description=f"Updated: {updated_template.display_name}"
                     )
 
@@ -102,7 +102,7 @@ class ManageDocumentTemplatesView(APIView):
                     user=request.user,
                     action="DELETE",
                     entity="DocumentTemplate",
-                    entity_id=template.template_id,
+                    admin_id=template.template_id,
                     description=f"Deleted template: {template.display_name}"
                 )
 

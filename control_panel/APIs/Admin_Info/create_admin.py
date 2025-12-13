@@ -1,6 +1,6 @@
 from site import abs_paths
 from admin_hub.models import PortalUserLog
-from control_panel import master_data
+from control_panel.master_data import master_data
 from utils.database.admin_database_manage import run_migrations_for_admin, setup_admin_database
 from ...views import *
 
@@ -37,17 +37,29 @@ class AdminManagementAPIView(APIView):
 
     def create_admin(self, request):
         try:
+            uploaded_files = request.FILES  
+            data = dict(request.data)  
+            kyc_paths = self._handle_document_uploads(uploaded_files, 'kyc_docs/')
+            kyc_paths = self._handle_document_uploads(uploaded_files, 'kyc_docs/')
+            
+            if not kyc_paths and DocumentTemplate.objects.filter(mandatory=True).exists():
+                return Response({
+                    "status": "fail",
+                    "message": "Required KYC documents are missing."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            name = data.get('name')
+            contact_no = data.get('contact_no')
+            email = data.get('email', '')
+            if not name or not contact_no:
+                return Response({
+                    "status": "fail",
+                    "message": "name and contact_no are required"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db_name = f"admin_db_{name.lower().replace(' ', '_')}_{int(datetime.now().timestamp())}"
+
             with transaction.atomic():
-                data = request.data.copy()
-                name = data.get('name')
-                contact_no = data.get('contact_no')
-                email = data.get('email', '')
-
-                db_name = f"admin_db_{name.lower().replace(' ', '_')}_{int(datetime.now().timestamp())}"
-                kyc_paths = self._handle_document_uploads(data, 'kyc_docs/')
-                if not kyc_paths and DocumentTemplate.objects.filter(is_required=True).exists():
-                    raise ValidationError("Required KYC documents are missing.")
-
                 serializer = AdminSerializer(
                     data=data,
                     context={'request': request}
@@ -56,9 +68,9 @@ class AdminManagementAPIView(APIView):
                 admin = serializer.save(
                     created_by=request.user,
                     db_name=db_name,
-                    document_bundle=kyc_paths
+                    documents_uploaded=kyc_paths,
                 )
-                
+
                 default_charges = ChargeRule.objects.filter(
                     charge_beneficiary='admin_SHARE'
                 ).values_list('pk', flat=True)
@@ -71,17 +83,14 @@ class AdminManagementAPIView(APIView):
                     "contract_status": "DRAFT",
                     "signed_document": data.get('agreement_document')
                 }
-                contract_serializer = AdminContractSerializer(
-                    data=contract_data,
-                    context={'request': request}
-                )
+                contract_serializer = AdminContractSerializer(data=contract_data, context={'request': request})
                 contract_serializer.is_valid(raise_exception=True)
                 contract_serializer.save(created_by=request.user)
 
                 self.log_activity(
                     table_name='admin_profile',
                     action='create',
-                    description=f"Created admin: {admin.business_name}",
+                    description=f"Created admin: {getattr(admin, 'business_name', name)}",
                     instance_id=admin.pk,
                     request=request
                 )
@@ -94,28 +103,32 @@ class AdminManagementAPIView(APIView):
 
             portal_user = PortalUser.objects.using(db_name).create(
                 full_name=name,
-                phone=contact_no,
-                email=email,
-                role='admin_ADMIN',
-                is_active=True
+                mobile_number=contact_no,
+                email_address=email or f"admin_{contact_no}@example.com",  
+                member_type='SUPER_ADMIN',  
+                is_suspended=False,
+                email_confirmed=True,
+                kyc_completed=True,
+                account_status='APPROVED'
             )
 
             PortalUserBalance.objects.using(db_name).create(
                 user=portal_user,
-                balance=Decimal('0.00')
+                primary_balance=Decimal('0.000')
             )
 
             master_data(db_name)
 
             return Response({
                 "status": "success",
-                "message": "admin onboarded successfully",
+                "message": "Admin onboarded successfully",
                 "admin_id": admin.pk,
                 "database": db_name
             }, status=status.HTTP_201_CREATED)
 
         except ValidationError as ve:
-            return Response({"status": "fail", "message": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+            error_msg = build_error_response(ve.detail) if hasattr(ve, 'detail') else str(ve)
+            return Response({"status": "fail", "message": error_msg}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -275,32 +288,46 @@ class AdminManagementAPIView(APIView):
         except Exception as e:
             return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _handle_document_uploads(self, data, folder):
+    def _handle_document_uploads(self, files_dict, folder):
         uploads = {}
-        for key, file in data.items():
-            if hasattr(file, 'read'):  
-                if file.size > 15 * 1024 * 1024:
-                    raise ValidationError(f"{key}: File too large (max 15MB)")
+        expected_keys = ['pan_copy', 'aadhaar_front', 'aadhaar_back', 'gst_certificate', 'agreement_document']
 
-                filename = f"{key}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.name}"
-                path = os.path.join(settings.MEDIA_ROOT, folder, filename)
+        for key in expected_keys:
+            file = files_dict.get(key)
+            if not file:
+                continue
 
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, 'wb+') as f:
-                    for chunk in file.chunks():
-                        f.write(chunk)
+            if isinstance(file, list):
+                file = file[0]
 
-                uploads[key] = os.path.join(folder, filename).replace('\\', '/')
+            if file.size > 15 * 1024 * 1024:
+                raise ValidationError(f"{key}: File too large (max 15MB)")
+
+            filename = f"{key}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.name}"
+            relative_path = os.path.join(folder, filename).replace('\\', '/')
+            full_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            with open(full_path, 'wb+') as f:
+                for chunk in file.chunks():
+                    f.write(chunk)
+
+            uploads[key] = relative_path
+
         return uploads
 
     def log_activity(self, table_name, action, description, instance_id, request):
         AdminActivityLog.objects.create(
-            table_name=table_name,
-            record_id=instance_id,
+            user=request.user,
             action=action,
             description=description,
-            performed_by=request.user,
-            ip_address=self._get_client_ip(request)
+            ip_address=self._get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            request_data={
+                'table_name': table_name,
+                'record_id': instance_id,
+                'extra_info': f"Admin {action}: {description}"
+            } if instance_id else None
         )
 
     def _get_client_ip(self, request):

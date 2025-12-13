@@ -1,4 +1,6 @@
 import decimal
+
+from utils.Api.dynamic_label import super_admin_action_label
 from ...views import *
 
 
@@ -10,7 +12,7 @@ class AdminWalletAdjustmentView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin]
 
-    # Tere naye models ka royal mapping (same logic, sundar style)
+
     SERVICE_TXN_MAPPING = {
         '2':  ('dmt.FundTransferEntry', 'reference_code', 'current_status', 'transfer_amount'),
         '4':  ('dmt.FundTransferEntry', 'reference_code', 'current_status', 'transfer_amount'),
@@ -77,7 +79,6 @@ class AdminWalletAdjustmentView(APIView):
             admin = Admin.objects.get(admin_id=admin_id)
             switch_to_database(admin.db_name)
 
-            # Find provider in tenant DB
             partner = ServiceProvider.objects.using(admin.db_name).get(
                 master_id=sp_id
             )
@@ -94,7 +95,6 @@ class AdminWalletAdjustmentView(APIView):
             if current_status == "REVERSED":
                 return Response({"status": "fail", "message": "Already reversed"}, status=400)
 
-            # Get wallet entries
             gl_entries = GlTrn.objects.using(admin.db_name).filter(
                 service_table=transaction._meta.db_table,
                 service_record_id=transaction.pk
@@ -142,7 +142,7 @@ class AdminWalletAdjustmentView(APIView):
 
     def process_adjustment(self, request):
         admin_id = request.data.get('admin_id')
-        charge_type = request.data.get('charge_type')  # CR or DR
+        charge_type = request.data.get('charge_type')  
         amount = request.data.get('amount')
         wallet = request.data.get('wallet')
         description = request.data.get('description', '')
@@ -157,7 +157,7 @@ class AdminWalletAdjustmentView(APIView):
             main_user = PortalUser.objects.using(admin.db_name).get(id=1)
             user_wallet = PortalUserBalance.objects.using(admin.db_name).get(user=main_user)
 
-            # Manual Credit/Debit
+            
             if charge_type:
                 current = decimal.Decimal(getattr(user_wallet, wallet, 0))
                 if charge_type == 'CR':
@@ -167,11 +167,9 @@ class AdminWalletAdjustmentView(APIView):
                 else:
                     return Response({"status": "fail", "message": "Invalid type"}, status=400)
 
-                # Update wallet
                 setattr(user_wallet, wallet, new_balance)
                 user_wallet.save(using=admin.db_name)
 
-                # Create log entry
                 label = super_admin_action_label(
                     "MANUAL ADJUSTMENT", None, charge_type, float(amount), wallet, description, None
                 )
@@ -195,7 +193,6 @@ class AdminWalletAdjustmentView(APIView):
                     "message": f"Wallet {charge_type} successful"
                 })
 
-            # Transaction Reversal
             sp_id = request.data.get('sp_id')
             txn_ref = request.data.get('transaction_id')
 
@@ -211,7 +208,6 @@ class AdminWalletAdjustmentView(APIView):
             if getattr(transaction, status_field) == "REVERSED":
                 return Response({"status": "fail", "message": "Already reversed"}, status=400)
 
-            # Mark as reversed
             setattr(transaction, status_field, 'REVERSED')
             transaction.save(using=admin.db_name)
 

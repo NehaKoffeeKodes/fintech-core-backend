@@ -6,40 +6,40 @@ class AdminLoginDetailView(APIView):
 
     def get(self, request):
         try:
-            current_admin = AdminAccount.objects.select_related().get(id=request.user.id)
-            
-            sessions = Superadminlogindetails.objects.filter(
-                staff=current_admin
-            ).order_by('-login_timestamp')
-            
-            serialized_data = SuperAdminLoginDetailSerializer(sessions, many=True)
+            current_admin = AdminAccount.objects.only('id', 'first_name', 'last_name').get(id=request.user.id)
+            login_sessions = Superadminlogindetails.objects.filter(
+                user=current_admin
+            ).order_by('-login_time')
 
-            enriched_data = []
-            for item in serialized_data.data:
-                try:
-                    staff_obj = AdminAccount.objects.only('full_name').get(id=item['staff'])
-                    item['staff'] = staff_obj.full_name.strip() or "Unknown User"
-                except AdminAccount.DoesNotExist:
-                    item['staff'] = "Deleted User"
-                enriched_data.append(item)
+            sessions_list = []
+            for session in login_sessions:
+                sessions_list.append({
+                    "id": session.id,
+                    "admin_name": current_admin.get_full_name().strip() or "Unknown Admin",
+                    "ip_address": session.ip_address or "N/A",
+                    "browser_name": session.browser_name or "Unknown",
+                    "device_info": session.device_info or "Unknown Device",
+                    "login_time": session.login_time.isoformat() if session.login_time else "N/A"
+                })
 
             return Response({
-                'success': True,
-                'message': 'Session history retrieved successfully',
-                'data': {
-                    'sessions': enriched_data
+                "success": True,
+                "message": "Login session history fetched successfully",
+                "data": {
+                    "total_sessions": len(sessions_list),
+                    "sessions": sessions_list
                 }
             }, status=status.HTTP_200_OK)
 
         except AdminAccount.DoesNotExist:
             return Response({
-                'success': False,
-                'message': 'Admin profile not found'
+                "success": False,
+                "message": "Admin account not found or invalid session"
             }, status=status.HTTP_404_NOT_FOUND)
 
-        except Exception as unexpected_error:
+        except Exception as e:
             return Response({
-                'success': False,
-                'message': 'Something went wrong on server',
-                'error': str(unexpected_error)
+                "success": False,
+                "message": "Failed to retrieve login history",
+                "details": "Internal server error"  
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

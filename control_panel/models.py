@@ -132,7 +132,7 @@ class PortalUser(models.Model):
         ('KYC_IN_PROGRESS', 'KYC In Progress'),
     ]
 
-    member_id = models.AutoField(primary_key=True)
+    id = models.AutoField(primary_key=True)
     full_name = models.CharField(max_length=200, db_index=True)
     email_address = models.EmailField(unique=True, db_index=True)
     mobile_number = models.CharField(max_length=10,validators=[RegexValidator(r'^\d{10}$', 'Enter a valid 10-digit mobile number')])
@@ -242,7 +242,7 @@ class Admin(models.Model):
         (STATUS_REJECTED, 'Rejected'),
     ]
 
-    entity_id = models.AutoField(primary_key=True)
+    admin_id = models.AutoField(primary_key=True)
     entity_name = models.CharField(max_length=150, unique=True)
     mobile = models.CharField(max_length=10, unique=True)
     email = models.EmailField(unique=True)
@@ -262,10 +262,11 @@ class Admin(models.Model):
     pin_code = models.CharField(max_length=6, null=True, blank=True)
     enabled_services = models.JSONField(default=list, blank=True)
     agreement_pdf = models.FileField(upload_to='agreements/', null=True, blank=True)
+    db_name = models.CharField(max_length=100, unique=True, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_soft_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,null=True,related_name='entities_created_by')
+    created_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,related_name='entities_created_by')
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
@@ -279,7 +280,7 @@ class Admin(models.Model):
         return f"{self.entity_name} ({self.get_status_display()})"
 
     class Meta:
-        db_table = 'platform_business_entities'
+        db_table = 'admin'
         
   
 
@@ -440,9 +441,9 @@ class DepositBankAccount(models.Model):
     is_enabled = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
     added_at = models.DateTimeField(auto_now_add=True)
-    added_by = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='deposit_banks_created',null=True,blank=True)
+    added_by = models.ForeignKey(AdminAccount,on_delete=models.PROTECT,related_name='deposit_banks_created',null=True,blank=True)
     modified_at = models.DateTimeField(auto_now=True)
-    modified_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,related_name='deposit_banks_updated',null=True,blank=True)
+    modified_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,related_name='deposit_banks_updated',null=True,blank=True)
 
     class Meta:
         db_table = 'config_deposit_banks'
@@ -721,8 +722,104 @@ class SaAdditionalCharges(models.Model):
     def __str__(self):
         return f"{self.title or 'No Title'} ({self.amount or 0})"
     
+from django.db import models
 
 
+class Charges(models.Model):
+    CREDIT = 'CR'
+    DEBIT = 'DR'
+    CHARGE_TYPE_CHOICES = [
+        (CREDIT, 'Credit'),
+        (DEBIT, 'Debit'),
+    ]
+
+    FLAT = 'is_flat'
+    PERCENT = 'is_percent'
+    RATE_TYPE_CHOICES = [
+        (FLAT, 'Is Flat'),
+        (PERCENT, 'Is Percent'),
+    ]
+
+    TO_US = 'to_us'
+    TO_PROVIDE = 'to_provide'
+    CATEGORY_CHOICES = [
+        (TO_US, 'To Us'),
+        (TO_PROVIDE, 'To Provide'),
+    ]
+
+    charges_id = models.AutoField(primary_key=True)
+    service_provider = models.ForeignKey(
+        ServiceProvider,  
+        on_delete=models.CASCADE,
+        related_name='charges'
+    )
+    charges_type = models.CharField(
+        max_length=2,
+        choices=CHARGE_TYPE_CHOICES,
+        help_text="Type of charge: Credit or Debit"
+    )
+    rate_type = models.CharField(
+        max_length=20,
+        choices=RATE_TYPE_CHOICES,
+        help_text="Whether rate is flat amount or percentage"
+    )
+    minimum = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Minimum transaction amount for this slab"
+    )
+    maximum = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Maximum transaction amount for this slab"
+    )
+    rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Charge rate (flat or percentage based on rate_type)"
+    )
+    identifier_id = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Used for identifier-based services"
+    )
+    charge_category = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default=TO_US,
+        help_text="Who receives the charge: To Us or To Provide"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+    updated_by = models.ForeignKey(
+        AdminAccount, 
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='updated_by',
+        related_name='updated_charges'
+    )
+    is_deactive = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'sa_charges'
+        verbose_name = 'Charge Slab'
+        verbose_name_plural = 'Charge Slabs'
+        ordering = ['minimum', 'charges_id']
+
+    def __str__(self):
+        provider = self.service_provider.label if hasattr(self.service_provider, 'label') else self.service_provider.sp_name
+        return f"Charge {self.charges_id} - {provider} ({self.get_charges_type_display()})"
+
+   
 class DocumentTemplate(models.Model):
     template_id = models.AutoField(primary_key=True)
     display_name = models.CharField(max_length=100, help_text="Name shown to user")
