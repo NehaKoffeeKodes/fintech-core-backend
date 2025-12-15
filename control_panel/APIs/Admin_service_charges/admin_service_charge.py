@@ -247,7 +247,7 @@ class ServiceChargesManagementView(APIView):
             if not main_provider.is_charge_identifier:
                 # Standard provider flow
                 for sp in providers:
-                    service = SaService.objects.filter(service_id=sp.service.service_id).first()
+                    service = SaCoreService.objects.filter(service_id=sp.service.service_id).first()
                     self._ensure_hsn_exists(sp.hsn_sac, portal_usr)
 
                     slabs = Charges.objects.filter(
@@ -287,7 +287,7 @@ class ServiceChargesManagementView(APIView):
 
             else:
                 # Identifier-based flow
-                identifiers = SaServiceIdentifier.objects.filter(sp__sp_id=sp_id)
+                identifiers = SaCoreServiceIdentifier.objects.filter(sp__sp_id=sp_id)
                 for identifier in identifiers:
                     self._ensure_hsn_exists(identifier.sp.hsn_sac, portal_usr)
 

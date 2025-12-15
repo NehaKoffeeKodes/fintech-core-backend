@@ -257,10 +257,10 @@ class EmailSettingsView(APIView):
             setting = SmtpEmail.objects.get(smtp_id=smtp_id)
 
             if setting.verify_otp != entered_otp:
-                return Response({"status": "fail", "message": "Galat OTP"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"status": "fail", "message": "invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
 
             if setting.otp_expires_at < timezone.now():
-                return Response({"status": "fail", "message": "OTP expire ho gaya"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"status": "fail", "message": "OTP expired"}, status=status.HTTP_400_BAD_REQUEST)
 
             if request.data.get('host'):         setting.smtp_host = request.data['host']
             if request.data.get('port'):         setting.smtp_port = request.data['port']
@@ -272,10 +272,10 @@ class EmailSettingsView(APIView):
 
             return Response({
                 "status": "success",
-                "message": "Email settings save ho gaye!"
+                "message": "Email save successfully!"
             })
 
         except SmtpEmail.DoesNotExist:
-            return Response({"status": "fail", "message": "Setting nahi mili"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"status": "fail", "message": "email not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

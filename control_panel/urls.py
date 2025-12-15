@@ -15,6 +15,7 @@ from control_panel.APIs.Admin_Info.fund_request import*
 from control_panel.APIs.Admin_Info.gst_tax_verification import*
 from control_panel.APIs.Admin_Info.s_admin_other_charges import *
 from control_panel.APIs.Admin_Info.required_documents_list import *
+from control_panel.APIs.State.state_create import StateAPIView
 from control_panel.send_otp import SendOTPEmailAPI
 
 
@@ -25,8 +26,9 @@ urlpatterns = [
     #HSNSAC
     path('gst-code-manage/',GSTCodeManagerView.as_view()),
     
-    #city_and_state 
-    path('city/',CityListView.as_view()),
+    path('city/', CityAPIView.as_view()),
+    
+    path('state/',StateAPIView.as_view()),
     
     #CHANGE_PASSWORD
     path('change-password/',UpdatePasswordView.as_view()),

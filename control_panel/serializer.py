@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import*
+from admin_hub.models import *
+
 
 
 class AdminSerializer(serializers.ModelSerializer):
@@ -11,6 +12,10 @@ class AdminSerializer(serializers.ModelSerializer):
     tax_on_contract = serializers.SerializerMethodField()
     net_payable = serializers.SerializerMethodField()
     contract_approval_status = serializers.SerializerMethodField()
+    registered_state = serializers.CharField(write_only=True, required=True, allow_blank=False)
+    registered_city = serializers.CharField(write_only=True, required=True, allow_blank=False)
+    registered_state_detail = serializers.CharField(source='registered_state.name', read_only=True)
+    registered_city_detail = serializers.CharField(source='registered_city.title', read_only=True)
 
     class Meta:
         model = Admin
@@ -117,6 +122,65 @@ class AdminSerializer(serializers.ModelSerializer):
             data.pop(key, None)
         return data
     
+    def create(self, validated_data):
+        # State aur City ke naam pop karo
+        state_name = validated_data.pop('registered_state', None)
+        city_name = validated_data.pop('registered_city', None)
+
+        # Admin create karo
+        admin_instance = super().create(validated_data)
+
+        # State object fetch karke assign karo
+        if state_name:
+            try:
+                state_obj = Region.objects.get(name__iexact=state_name.strip())
+                admin_instance.registered_state = state_obj
+            except Region.DoesNotExist:
+                raise serializers.ValidationError({
+                    "registered_state": f"State '{state_name}' not found in database."
+                })
+
+        # City object fetch karke assign karo
+        if city_name:
+            try:
+                city_obj = Location.objects.get(title__iexact=city_name.strip())
+                admin_instance.registered_city = city_obj
+            except Location.DoesNotExist:
+                raise serializers.ValidationError({
+                    "registered_city": f"City '{city_name}' not found in database."
+                })
+
+        admin_instance.save()
+        return admin_instance
+
+    def update(self, instance, validated_data):
+        # Same logic for update
+        state_name = validated_data.pop('registered_state', None)
+        city_name = validated_data.pop('registered_city', None)
+
+        instance = super().update(instance, validated_data)
+
+        if state_name is not None:
+            try:
+                state_obj = Region.objects.get(name__iexact=state_name.strip())
+                instance.registered_state = state_obj
+            except Region.DoesNotExist:
+                raise serializers.ValidationError({
+                    "registered_state": f"State '{state_name}' not found."
+                })
+
+        if city_name is not None:
+            try:
+                city_obj = Location.objects.get(title__iexact=city_name.strip())
+                instance.registered_city = city_obj
+            except Location.DoesNotExist:
+                raise serializers.ValidationError({
+                    "registered_city": f"City '{city_name}' not found."
+                })
+
+        instance.save()
+        return instance
+    
     
 class AdminContractSerializer(serializers.ModelSerializer):
     class Meta:
@@ -199,7 +263,7 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
             service_provider=obj,
             is_deleted=False
         )
-        return ChargeRuleSerializer(
+        return ChargesRuleSerializer(
             charges,
             many=True,
             context={'exclude_fields': ["created_at", "updated_at", "updated_by", "is_deleted"]}
@@ -424,11 +488,23 @@ class GSTCodeManagerSerializer(serializers.ModelSerializer):
     
    
 
-
-
-class LocationDataSerializer(serializers.ModelSerializer):    
+class StateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = None 
+        model = Region
+        fields = '__all__'
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        fields_to_exclude = self.context.get('exclude_fields', [])
+        for field_name in fields_to_exclude:
+            ret.pop(field_name, None)
+        return ret
+
+
+
+class CitySerializer(serializers.ModelSerializer):    
+    class Meta:
+        model = Location 
         fields = '__all__'
         read_only_fields = ('created_at', 'updated_at', 'added_on', 'modified_on')
 
@@ -453,7 +529,11 @@ class LocationDataSerializer(serializers.ModelSerializer):
             return {"error": "Serialization failed", "detail": str(e)}
         
     
-    
+
+class DisputeRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Servicedispute
+        fields = '__all__'   
 
 
 class FundRequestSerializer(serializers.ModelSerializer):
@@ -490,7 +570,7 @@ class FundRequestSerializer(serializers.ModelSerializer):
     
 
 
-class ChargeRuleSerializer(serializers.ModelSerializer):
+class ChargesRuleSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     provider_label = serializers.CharField(source='service_provider.label', read_only=True)
     service_name = serializers.CharField(source='service.service.service_name', read_only=True, allow_null=True)
@@ -620,3 +700,29 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
         instance.modified_on = __import__('datetime').datetime.now()
         instance.save()
         return instance
+
+
+class ProductItemSerializer(serializers.ModelSerializer):
+    item_status = serializers.SerializerMethodField()
+    item_images = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductItem
+        fields = '__all__'
+        read_only_fields = ('added_on', 'added_by', 'modified_on')
+
+    def get_item_status(self, obj):
+        return "Active" if not obj.inactive else "Inactive"
+
+    def get_item_images(self, obj):
+        request = self.context.get('request')
+        if obj.images and request:
+            host = request.build_absolute_uri('/')[:-1]
+            return [f"{host}/media/{path}" for path in obj.images]
+        return []
+
+
+class PurchaseRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GadgetPurchase
+        exclude = ["initiated_by", "modified_on"]

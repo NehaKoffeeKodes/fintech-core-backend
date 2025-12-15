@@ -1,6 +1,3 @@
-import decimal
-
-from utils.Api.dynamic_label import super_admin_action_label
 from ...views import *
 
 
@@ -14,31 +11,31 @@ class AdminWalletAdjustmentView(APIView):
 
 
     SERVICE_TXN_MAPPING = {
-        '2':  ('dmt.FundTransferEntry', 'reference_code', 'current_status', 'transfer_amount'),
-        '4':  ('dmt.FundTransferEntry', 'reference_code', 'current_status', 'transfer_amount'),
-        '6':  ('dmt.FundTransferEntry', 'reference_code', 'current_status', 'transfer_amount'),
-        '8':  ('electricity.ElectricityBillEntry', 'unique_ref', 'bill_status', 'bill_amount'),
-        '9':  ('gas.GasBillEntry', 'transaction_ref', 'payment_status', 'due_amount'),
-        '10': ('lic.LicPremiumEntry', 'lic_ref_id', 'premium_status', 'premium_amount'),
-        '11': ('recharge.RechargeHistory', 'request_txn_id', 'recharge_status', 'recharge_amount'),
-        '12': ('bbps.BillPaymentRecord', 'request_ref', 'payment_status', 'bill_amount'),
-        '45': ('bbps.BillPaymentRecord', 'request_ref', 'payment_status', 'bill_amount'),
-        '41': ('cashfree.CashfreePaymentLog', 'cf_order_id', 'payment_status', 'payment_amount'),
-        '74': ('cashfree.CashfreePaymentLog', 'cf_order_id', 'payment_status', 'payment_amount'),
-        '42': ('phonepe.PhonePePaymentEntry', 'merchant_txn_id', 'current_status', 'amount_paid'),
-        '75': ('phonepe.PhonePePaymentEntry', 'merchant_txn_id', 'current_status', 'amount_paid'),
-        '44': ('payout.MoneyTransferLog', 'reference_code', 'transfer_status', 'transfer_amount'),
-        '77': ('payout.MoneyTransferLog', 'reference_code', 'transfer_status', 'transfer_amount'),
-        '80': ('aeps.AepsCashLog', 'reference_no', 'current_status', 'txn_amount'),
-        '84': ('bulkpe.BulkPayoutRecord', 'payout_ref', 'payout_result', 'transfer_amount'),
-        '85': ('airtel.AirtelBillEntry', 'cms_ref', 'bill_status', 'bill_amount'),
-        '86': ('bankit.BankItAepsRecord', 'bankit_txn', 'txn_status', 'amount'),
-        '92': ('microatm.MicroAtmEntry', 'txn_ref', 'current_status', 'txn_amount'),
-        '95': ('dmt.FundTransferEntry', 'reference_code', 'current_status', 'transfer_amount'),
-        '97': ('bankit.BankItAepsRecord', 'bankit_txn', 'txn_status', 'amount'),
-        '103':('microatm.MicroAtmEntry', 'txn_ref', 'current_status', 'txn_amount'),
-        '106':('ppi.PpiTransferLog', 'txn_ref_id', 'txn_status', 'amount'),
-        '109':('digikhata.KhataTransferEntry', 'reference_no', 'current_status', 'transfer_amount'),
+        '2':  (FundTransferEntry, 'reference_code', 'current_status', 'transfer_amount'),
+        '4':  (FundTransferEntry, 'reference_code', 'current_status', 'transfer_amount'),
+        '6':  (FundTransferEntry, 'reference_code', 'current_status', 'transfer_amount'),
+        '8':  (ElectricityBillEntry, 'unique_ref', 'bill_status', 'bill_amount'),
+        '9':  (GasBillEntry, 'transaction_ref', 'payment_status', 'due_amount'),
+        '10': (LicPremiumEntry, 'lic_ref_id', 'premium_status', 'premium_amount'),
+        '11': (RechargeHistory, 'request_txn_id', 'recharge_status', 'recharge_amount'),
+        '12': (BillPaymentRecord, 'request_ref', 'payment_status', 'bill_amount'),
+        '45': (BillPaymentRecord, 'request_ref', 'payment_status', 'bill_amount'),
+        '41': (CashfreePaymentLog, 'cf_order_id', 'payment_status', 'payment_amount'),
+        '74': (CashfreePaymentLog, 'cf_order_id', 'payment_status', 'payment_amount'),
+        '42': (PhonePePaymentEntry, 'merchant_txn_id', 'current_status', 'amount_paid'),
+        '75': (PhonePePaymentEntry, 'merchant_txn_id', 'current_status', 'amount_paid'),
+        '44': (MoneyTransferLog, 'reference_code', 'transfer_status', 'transfer_amount'),
+        '77': (MoneyTransferLog, 'reference_code', 'transfer_status', 'transfer_amount'),
+        '80': (AepsCashLog, 'reference_no', 'current_status', 'txn_amount'),
+        '84': (BulkPayoutRecord, 'payout_ref', 'payout_result', 'transfer_amount'),
+        '85': (AirtelBillEntry, 'cms_ref', 'bill_status', 'bill_amount'),
+        '86': (BankItAepsRecord, 'bankit_txn', 'txn_status', 'amount'),
+        '92': (MicroAtmEntry, 'txn_ref', 'current_status', 'txn_amount'),
+        '95': (FundTransferEntry, 'reference_code', 'current_status', 'transfer_amount'),
+        '97': (BankItAepsRecord, 'bankit_txn', 'txn_status', 'amount'),
+        '103':(MicroAtmEntry, 'txn_ref', 'current_status', 'txn_amount'),
+        '106':(PpiTransferLog, 'txn_ref_id', 'txn_status', 'amount'),
+        '109':(KhataTransferEntry, 'reference_no', 'current_status', 'transfer_amount'),
     }
 
     def post(self, request):

@@ -1,4 +1,3 @@
-from django.db import connection, connections
 from ...views import *
 
 
@@ -93,7 +92,7 @@ class SuperAdminTransactionReportView(APIView):
                 "8": {"model": ElectricityBillEntry, "table": "ad_ux_electricity_transaction", "sp_field": "sp", "amt_field": "amount", "status_field": "ux_status", "cust_name": "consumer_name", "cust_mobile": "mobile_number", "ref_id": "ux_unique_trn_id"},
                 "9": {"model": GasBillEntry, "table": "ad_ux_gas_transaction", "sp_field": "sp", "amt_field": "amount", "status_field": "ux_status", "cust_name": "consumer_name", "cust_mobile": "mobile_number", "ref_id": "ux_unique_trn_id"},
                 "10": {"model": LicPremiumEntry, "table": "ad_ux_LIC_transaction", "sp_field": "sp", "amt_field": "amount", "status_field": "ux_lic_status", "cust_name": "", "cust_mobile": "mobile_number", "ref_id": "ux_lic_unique_trn_id"},
-                "11": {"model": MobileRecharge, "table": "ad_mobile_recharge", "sp_field": "mr_sp", "amt_field": "mr_amount", "status_field": "mr_status", "cust_name": "", "cust_mobile": "mr_mobile_no", "ref_id": "mr_request_txnid"},
+                "11": {"model": RechargeTransaction, "table": "ad_mobile_recharge", "sp_field": "mr_sp", "amt_field": "mr_amount", "status_field": "mr_status", "cust_name": "", "cust_mobile": "mr_mobile_no", "ref_id": "mr_request_txnid"},
                 "12": {"model": BillPaymentRecord, "table": "ad_bbps_service_trnasaction", "sp_field": "bbps_sp", "amt_field": "bbps_amount", "status_field": "bbps_status", "cust_name": "", "cust_mobile": "bbps_contact_no", "ref_id": "bbps_request_id"},
                 "41": {"model": CashfreePaymentLog, "table": "ad_cashfree_pg_service_transaction", "sp_field": "sp", "amt_field": "cf_pg_trn_amount", "status_field": "cf_pg_trn_status", "cust_name": "", "cust_mobile": "cf_pg_customer_contact_no", "ref_id": "cf_pg_trn_unique_id"},
                 "42": {"model": PhonePePaymentEntry, "table": "ad_phonepe_service_transaction", "sp_field": "sp", "amt_field": "pp_amount", "status_field": "pp_status", "cust_name": "", "cust_mobile": "pp_contact_no", "ref_id": "pp_marchant_trn_id"},

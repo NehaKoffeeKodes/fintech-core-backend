@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta
 
 def enforce_required_fields(payload: dict, mandatory: list):
-    """Return error response if any required field is missing or empty"""
     absent = [key for key in mandatory if not payload.get(key)]
     if absent:
         return Response(

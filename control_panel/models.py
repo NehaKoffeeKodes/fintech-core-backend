@@ -2,7 +2,7 @@ from django.db import models
 from django.core.validators import RegexValidator
 from web_portal.models import*
 from django.contrib.auth import get_user_model
-from decimal import Decimal
+
 
 
 
@@ -98,7 +98,7 @@ class Region(models.Model):
 class Location(models.Model): 
     locality_id = models.AutoField(primary_key=True)
     region = models.ForeignKey(Region, on_delete=models.PROTECT, related_name='localities')
-    title = models.CharField(max_length=150)
+    city_name = models.CharField(max_length=150)
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.PositiveIntegerField(null=True, blank=True)
@@ -107,113 +107,40 @@ class Location(models.Model):
 
     class Meta:
         db_table = 'master_locations'
-        unique_together = ('title', 'region')
+        unique_together = ('city_name', 'region')
         verbose_name = 'Locality'
         verbose_name_plural = ' Locations'
         indexes = [
-            models.Index(fields=['title', 'region']),
+            models.Index(fields=['city_name', 'region']),
         ]
 
     def __str__(self):
-        return f"{self.title} ({self.region.name})"
+        return f"{self.city_name} ({self.region.name})"
 
 
-class PortalUser(models.Model):
-    MEMBER_CATEGORY = [
-        ('SUPER_ADMIN', 'Super Admin'),
-        ('DISTRIBUTOR', 'Distributor'),
-        ('RETAILER', 'Retailer'),
-    ]
 
-    WORKFLOW_STATUS = [
-        ('PENDING_REVIEW', 'Pending Review'),
-        ('APPROVED', 'Approved'),
-        ('REJECTED', 'Rejected'),
-        ('KYC_IN_PROGRESS', 'KYC In Progress'),
-    ]
-
-    id = models.AutoField(primary_key=True)
-    full_name = models.CharField(max_length=200, db_index=True)
-    email_address = models.EmailField(unique=True, db_index=True)
-    mobile_number = models.CharField(max_length=10,validators=[RegexValidator(r'^\d{10}$', 'Enter a valid 10-digit mobile number')])
-    access_pin = models.CharField(max_length=128, blank=True, null=True)
-    member_type = models.CharField(max_length=30, choices=MEMBER_CATEGORY)
-    otp_token = models.CharField(max_length=100, blank=True, null=True)
-    otp_expiry = models.DateTimeField(blank=True, null=True) 
-    email_confirmed = models.BooleanField(default=False)
-    virtual_account_active = models.BooleanField(default=False)
-    kyc_completed = models.BooleanField(default=False)
-    aeps_service_status = models.CharField(max_length=50, default="NOT_STARTED")
-    aeps_merchant_code = models.CharField(max_length=80, blank=True, null=True)
-    rejection_note = models.TextField(blank=True, null=True)   
-    service_config = models.JSONField(default=dict, blank=True, null=True)
-    allowed_domains = models.JSONField(default=list, blank=True, null=True)
-    active_modules = models.JSONField(default=list, blank=True, null=True)
-    pinned_features = models.JSONField(default=dict, blank=True, null=True)
-    extra_info = models.JSONField(default=dict, blank=True, null=True) 
-    account_status = models.CharField(max_length=30,choices=WORKFLOW_STATUS,default='PENDING_REVIEW')
-    two_factor_secret = models.CharField(max_length=80, blank=True, null=True)
-    registered_at = models.DateTimeField(auto_now_add=True)
-    registered_by = models.ForeignKey('self',on_delete=models.PROTECT,related_name='members_created_by_me',null=True,blank=True)
-    last_updated = models.DateTimeField(auto_now=True)
-    is_suspended = models.BooleanField(default=False)
-    is_removed = models.BooleanField(default=False)
+class Servicedispute(models.Model):
+    complaint_id = models.AutoField(primary_key=True)
+    provider_id = models.IntegerField(null=True, blank=True)                
+    txn_ref = models.CharField(max_length=255, null=True, blank=True)       
+    admin = models.IntegerField(null=True, blank=True)                      
+    database_name = models.CharField(max_length=255, null=True, blank=True)
+    txn_amount = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)  
+    retailer_notes = models.TextField(null=True, blank=True)                
+    admin_notes = models.TextField(null=True, blank=True)                   
+    created_on = models.DateTimeField(auto_now_add=True)                    
+    created_by_user = models.IntegerField(null=True, blank=True)           
+    updated_on = models.DateTimeField(null=True, blank=True)               
+    updated_by_user = models.IntegerField(null=True, blank=True)            
 
     class Meta:
-        db_table = 'core_system_members'
-        ordering = ['-registered_at']
-        verbose_name = 'System Member'
-        verbose_name_plural = 'System Members'
-
-    def clean(self):
-        if self.email_address:
-            self.email_address = self.email_address.lower().strip()
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
+        db_table = 'sa_service_complaint'         
+        app_label = 'control_panel'               
+        ordering = ['-created_on']
 
     def __str__(self):
-        return f"{self.full_name} - {self.member_type} ({self.get_account_status_display()})"
-   
-   
-
-class PortalUserInfo(models.Model):
-    profile_id = models.AutoField(primary_key=True)
-    user_account = models.OneToOneField(PortalUser,on_delete=models.PROTECT, related_name='profile_details',null=True,blank=True)
-    hierarchy_node = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,null=True,blank=True)
-    unique_member_code = models.CharField(max_length=12,blank=True, unique=True)
-    aadhaar_number = models.CharField(max_length=12,validators=[RegexValidator(r'^\d{12}$', 'Aadhaar must be 12 digits')],null=True, blank=True)
-    pan_number = models.CharField(max_length=10,validators=[RegexValidator(r'^[A-Z]{5}[0-9]{4}[A-Z]$', 'Invalid PAN format')],null=True, blank=True, unique=True)
-    pan_verification_data = models.JSONField(null=True, blank=True)
-    business_name = models.CharField(max_length=200, null=True, blank=True)
-    outlet_photo = models.ImageField(upload_to='outlets/', null=True, blank=True)
-    outlet_coordinates = models.JSONField(null=True, blank=True)  
-    full_address = models.TextField(null=True, blank=True)
-    state_ref = models.ForeignKey(Region, on_delete=models.SET_NULL, null=True, related_name='+')
-    city_ref = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, related_name='+')
-    pincode = models.CharField(max_length=6, validators=[RegexValidator(r'^\d{6}$')], null=True, blank=True)
-    supporting_documents = models.JSONField(default=list, blank=True)  
-    gstin = models.CharField(max_length=15, null=True, blank=True, unique=True)
-    business_category = models.CharField(max_length=20, null=True, blank=True)  
-    secondary_mobile = models.CharField(max_length=10, null=True, blank=True)
-    live_location_capture = models.JSONField(null=True, blank=True)
-    created_by_user = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,null=True,related_name='profiles_created')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'core_member_profiles'
-        verbose_name = 'Member Profile'
-        ordering = ['-created_at']
-
-    def save(self, *args, **kwargs):
-        if self.pan_number:
-            self.pan_number = self.pan_number.upper()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"Profile: {self.user_account.full_name if self.user_account else 'N/A'} ({self.profile_id})" 
+        return f"Complaint {self.complaint_id} - {self.txn_ref or 'N/A'}"
+  
 
 
 class Admin(models.Model):
@@ -299,6 +226,7 @@ class SaCoreService(models.Model):
 
     def __str__(self):
         return self.title
+
 
 
 class ServiceProvider(models.Model):
@@ -389,40 +317,33 @@ class AdminContract(models.Model):
         return f"Contract #{self.contract_id} - {self.admin.business_name if self.admin else 'N/A'}"
         
 
-class PaymentGatewayBank(models.Model):
-    bank_id = models.AutoField(primary_key=True)
-    supported_services = models.JSONField(default=list)
-    bank_full_name = models.CharField(max_length=200, blank=True, null=True)
-    ifsc = models.CharField(max_length=11,validators=[RegexValidator(r'^[A-Z]{4}0[A-Z0-9]{6}$', 'Enter valid IFSC code')],blank=True,null=True)
-    branch = models.CharField(max_length=150, blank=True, null=True)
-    account_holder_name = models.CharField(max_length=200, blank=True, null=True)
-    account_no = models.CharField(max_length=30, blank=True, null=True)
-    account_category = models.CharField(max_length=50, blank=True, null=True) 
-    upi_imps_charges = models.JSONField(default=dict, blank=True, null=True)
-    cash_deposit_machine_charges = models.JSONField(default=dict, blank=True, null=True)
-    over_the_counter_charges = models.JSONField(default=dict, blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-    is_archived = models.BooleanField(default=False)
-    added_on = models.DateTimeField(auto_now_add=True)
-    added_by = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='bank_accounts_added',null=True,blank=True)
-    modified_on = models.DateTimeField(auto_now=True)
-    modified_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,related_name='bank_accounts_modified',null=True,blank=True)
+
+class SaCoreServiceIdentifier(models.Model):
+    config_id = models.AutoField(primary_key=True)
+    provider = models.ForeignKey(ServiceProvider, on_delete=models.PROTECT, null=True, blank=True)
+    settings = models.JSONField(null=True, blank=True)  
+    last_updated = models.DateTimeField(auto_now=True)  
+    updated_by = models.ForeignKey(
+        AdminAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='updated_by'
+    )
+    disabled = models.BooleanField(default=False)
+    removed = models.BooleanField(default=False)
 
     class Meta:
-        db_table = 'gateway_banks_config'
-        verbose_name = 'Payment Gateway Bank'
-        verbose_name_plural = 'Payment Gateway Banks'
-        ordering = ['-added_on']
+        db_table = 'sa_provider_config'
+        app_label = 'web_portal'
+        verbose_name = 'Provider Configuration'
+        verbose_name_plural = 'Provider Configurations'
+        ordering = ['-last_updated']
 
     def __str__(self):
-        return f"{self.bank_full_name or 'N/A'} - {self.account_no or 'No Account'} ({'Active' if self.is_active else 'Inactive'})"
-
-    def clean(self):
-        if self.ifsc:
-            self.ifsc = self.ifsc.upper().strip()
-        if self.account_no:
-            self.account_no = ''.join(filter(str.isdigit, self.account_no))
-            
+        return f"Config for {self.provider.sp_name if self.provider else 'No Provider'} (ID: {self.config_id})"
+    
+    
             
 
 
@@ -456,135 +377,6 @@ class DepositBankAccount(models.Model):
 
 
 
-class FundRequestStatus(models.TextChoices):
-    PENDING = 'PENDING', 'Pending'
-    APPROVED = 'APPROVED', 'Approved'
-    REJECTED = 'REJECTED', 'Rejected'
-    UNDER_REVIEW = 'UNDER_REVIEW', 'Under Review'
-
-class TransactionMode(models.TextChoices):
-    UPI = 'UPI', 'UPI'
-    IMPS = 'IMPS', 'IMPS'
-    NEFT = 'NEFT', 'NEFT'
-    RTGS = 'RTGS', 'RTGS'
-    CASH = 'CASH', 'Cash Deposit'
-    CDM = 'CDM', 'CDM Deposit'
-
-class FundDepositRequest(models.Model):
-    request_ref = models.AutoField(primary_key=True)
-    deposit_methods = models.JSONField(default=list)
-    linked_bank = models.ForeignKey(DepositBankAccount,on_delete=models.PROTECT,related_name='deposit_requests')
-    deposit_amount = models.DecimalField(max_digits=15, decimal_places=2)
-    reference_id = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    utr_ref = models.CharField(max_length=50, unique=True, blank=True, null=True, db_index=True)
-    transfer_mode = models.CharField(max_length=20,choices=TransactionMode.choices,blank=True,null=True)
-    proof_documents = models.JSONField(default=list)
-    user_remarks = models.TextField(blank=True, null=True)
-    admin_reasons = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=20,choices=FundRequestStatus.choices,default=FundRequestStatus.PENDING)
-    is_void = models.BooleanField(default=False)
-    is_removed = models.BooleanField(default=False)
-    submitted_at = models.DateTimeField(auto_now_add=True)
-    submitted_by = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='fund_requests_made',null=True,blank=True)
-    reviewed_at = models.DateTimeField(null=True, blank=True)
-    reviewed_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,related_name='fund_requests_reviewed',null=True,blank=True)
-
-    class Meta:
-        db_table = 'txn_fund_deposit_requests'
-        verbose_name = 'Fund Deposit Request'
-        ordering = ['-submitted_at']
-        indexes = [
-            models.Index(fields=['utr_ref']),
-            models.Index(fields=['status']),
-            models.Index(fields=['submitted_at']),
-        ]
-
-    def __str__(self):
-        return f"Request #{self.request_ref} - ₹{self.deposit_amount} [{self.get_status_display()}]"
-
-#useractivity
-
-class MemberActionLog(models.Model):
-    log_id = models.AutoField(primary_key=True)  
-    record_id = models.BigIntegerField(null=True, blank=True, db_index=True)
-    module_name = models.CharField(max_length=100, db_index=True, null=True, blank=True)
-    action_type = models.CharField(max_length=80, db_index=True) 
-    action_details = models.TextField(blank=True, null=True)
-    performed_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    performed_by = models.ForeignKey(PortalUser,on_delete=models.SET_NULL,null=True,blank=True,related_name='action_logs')
-    request_payload = models.JSONField(null=True, blank=True)   
-    response_payload = models.JSONField(null=True, blank=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    user_agent = models.CharField(max_length=255, null=True, blank=True)
-
-    class Meta:
-        db_table = 'core_activity_logs'
-        ordering = ['-performed_at']
-        verbose_name = 'Activity Log'
-        verbose_name_plural = 'Activity Logs'
-
-    def __str__(self):
-        user = self.performed_by.full_name if self.performed_by else "System"
-        return f"{user} → {self.action_type} on {self.module_name or 'Unknown'}"
-
-
-
-TRANSACTION_NATURE = [
-    ('CR', 'Credit'),
-    ('DR', 'Debit'),
-]
-
-class GlTrn(models.Model):
-    entry_id = models.AutoField(primary_key=True)
-    linked_service_id = models.BigIntegerField(null=True, blank=True)
-    member = models.ForeignKey(PortalUser,on_delete=models.PROTECT,null=True,blank=True,related_name='ledger_entries')
-    transaction_type = models.CharField(max_length=100, blank=True) 
-    amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
-    tds_percent = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal('0.0000'))
-    gst_percent = models.DecimalField(max_digits=8, decimal_places=4, default=Decimal('0.0000'))
-    tds_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    source_table = models.CharField(max_length=100, blank=True)  
-    wallet_type = models.CharField(max_length=30, blank=True)    
-    final_amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
-    entry_nature = models.CharField(max_length=6, choices=TRANSACTION_NATURE) 
-    transaction_time = models.DateTimeField(null=True, blank=True)
-    recorded_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'core_ledger_entries'
-        ordering = ['-recorded_at']
-
-    def __str__(self):
-        return f"Ledger #{self.entry_id} | ₹{self.amount} | {self.get_entry_nature_display()}"
-
-
-class WalletHistory(models.Model):
-    history_id = models.AutoField(primary_key=True)
-    reference_id = models.BigIntegerField(null=True, blank=True)   
-    action_name = models.CharField(max_length=150)                 
-    user = models.ForeignKey(PortalUser,on_delete=models.PROTECT,related_name='wallet_history')
-    wallet_name = models.CharField(max_length=50)                 
-    changed_amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
-    change_type = models.CharField(max_length=6, choices=TRANSACTION_NATURE)  
-    balance_after = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
-    remarks = models.CharField(max_length=500, blank=True)
-    transaction_date = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'core_wallet_history'
-        ordering = ['-created_at']
-        verbose_name = 'Wallet Transaction'
-        verbose_name_plural = 'Wallet Transactions'
-
-    def __str__(self):
-        return f"{self.user} → {self.get_change_type_display()} ₹{self.changed_amount} ({self.action_name})"
-    
-    
-
-
-
 class AdditionalFee(models.Model):
     fee_id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=150, blank=True, null=True)
@@ -605,41 +397,6 @@ class AdditionalFee(models.Model):
     def __str__(self):
         return f"{self.title or 'No Title'} ({self.amount or 0})"
     
-    
-
-class PortalUserBalance(models.Model):
-    balance_id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField(PortalUser,on_delete=models.PROTECT,related_name='wallet_account',db_column='portal_user_id',null=True,blank=True)
-    primary_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000)
-    earnings_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000)
-    deposit_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000, null=True, blank=True)
-    gateway_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000, null=True, blank=True)
-    outstanding_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000, null=True, blank=True)
-    hold_balance = models.DecimalField(max_digits=20, decimal_places=3, default=0.000, null=True, blank=True, help_text="Lien / Frozen amount")
-    created_on = models.DateTimeField(auto_now_add=True)
-    last_updated_on = models.DateTimeField(null=True, blank=True)
-    last_updated_by = models.PositiveIntegerField(null=True, blank=True)
-
-    class Meta:
-        db_table = 'portal_user_balances'
-        verbose_name = 'User Wallet'
-        verbose_name_plural = 'User Wallets'
-        indexes = [
-            models.Index(fields=['user']),
-        ]
-
-    def __str__(self):
-        return f"Wallet #{self.balance_id} - {self.user.get_full_name() or self.user.username or 'N/A'}"
-
-    def total_available(self):
-        return (
-            self.primary_balance +
-            self.earnings_balance +
-            (self.deposit_balance or 0) +
-            (self.gateway_balance or 0) +
-            (self.outstanding_balance or 0)
-        )
-        
 
 
 
@@ -721,8 +478,7 @@ class SaAdditionalCharges(models.Model):
 
     def __str__(self):
         return f"{self.title or 'No Title'} ({self.amount or 0})"
-    
-from django.db import models
+
 
 
 class Charges(models.Model):
@@ -748,64 +504,17 @@ class Charges(models.Model):
     ]
 
     charges_id = models.AutoField(primary_key=True)
-    service_provider = models.ForeignKey(
-        ServiceProvider,  
-        on_delete=models.CASCADE,
-        related_name='charges'
-    )
-    charges_type = models.CharField(
-        max_length=2,
-        choices=CHARGE_TYPE_CHOICES,
-        help_text="Type of charge: Credit or Debit"
-    )
-    rate_type = models.CharField(
-        max_length=20,
-        choices=RATE_TYPE_CHOICES,
-        help_text="Whether rate is flat amount or percentage"
-    )
-    minimum = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="Minimum transaction amount for this slab"
-    )
-    maximum = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="Maximum transaction amount for this slab"
-    )
-    rate = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="Charge rate (flat or percentage based on rate_type)"
-    )
-    identifier_id = models.IntegerField(
-        null=True,
-        blank=True,
-        help_text="Used for identifier-based services"
-    )
-    charge_category = models.CharField(
-        max_length=20,
-        choices=CATEGORY_CHOICES,
-        default=TO_US,
-        help_text="Who receives the charge: To Us or To Provide"
-    )
-
+    service_provider = models.ForeignKey(ServiceProvider,on_delete=models.CASCADE,related_name='charges')
+    charges_type = models.CharField(max_length=2,choices=CHARGE_TYPE_CHOICES)
+    rate_type = models.CharField(max_length=20,choices=RATE_TYPE_CHOICES)
+    minimum = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    maximum = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    rate = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    identifier_id = models.IntegerField(null=True,blank=True,)
+    charge_category = models.CharField(max_length=20,choices=CATEGORY_CHOICES,default=TO_US)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(null=True, blank=True)
-    updated_by = models.ForeignKey(
-        AdminAccount, 
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        db_column='updated_by',
-        related_name='updated_charges'
-    )
+    updated_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,blank=True,db_column='updated_by',related_name='updated_charges')
     is_deactive = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
 
@@ -819,7 +528,69 @@ class Charges(models.Model):
         provider = self.service_provider.label if hasattr(self.service_provider, 'label') else self.service_provider.sp_name
         return f"Charge {self.charges_id} - {provider} ({self.get_charges_type_display()})"
 
-   
+
+
+class ProductItemCategory(models.Model):
+    cat_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=150, unique=True)
+    description = models.TextField(blank=True, null=True)
+    parent_cat = models.IntegerField(null=True, blank=True)  
+    added_on = models.DateTimeField(auto_now_add=True)
+    added_by = models.ForeignKey(AdminAccount,related_name='categories_added',on_delete=models.CASCADE,db_column='added_by')
+    modified_on = models.DateTimeField(null=True, blank=True)
+    modified_by = models.ForeignKey(AdminAccount,related_name='categories_modified',on_delete=models.CASCADE,null=True,blank=True,db_column='modified_by')
+    inactive = models.BooleanField(default=False)
+    removed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'sa_item_category'
+        app_label = 'control_panel'
+        verbose_name = 'Item Category'
+        verbose_name_plural = 'Item Categories'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def get_full_path(self):
+        path = [self.name]
+        parent = self.parent_cat
+        while parent:
+            try:
+                parent_obj = ProductItemCategory.objects.get(cat_id=parent)
+                path.append(parent_obj.name)
+                parent = parent_obj.parent_cat
+            except ProductItemCategory.DoesNotExist:
+                break
+        return ' > '.join(reversed(path))
+    
+
+class ProductItem(models.Model):
+    item_id = models.AutoField(primary_key=True)
+    category = models.ForeignKey(ProductItemCategory, on_delete=models.CASCADE)  # Assuming ProductCategory exists
+    manufacturer = models.CharField(max_length=255)
+    item_model = models.CharField(max_length=255)
+    unique_serial = models.CharField(max_length=255, null=True, blank=True)
+    purchase_date = models.DateField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    stock_count = models.IntegerField()
+    details = models.TextField(null=True, blank=True)
+    images = models.JSONField(null=True, blank=True)
+    added_on = models.DateTimeField(auto_now_add=True)
+    added_by = models.ForeignKey(AdminAccount, related_name='items_added', on_delete=models.CASCADE, db_column='added_by')
+    modified_on = models.DateTimeField(null=True, blank=True)
+    modified_by = models.ForeignKey(AdminAccount, related_name='items_modified', on_delete=models.CASCADE, null=True, blank=True, db_column='modified_by')
+    removed = models.BooleanField(default=False)
+    inactive = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'sa_inventory_item'
+        app_label = 'control_panel'
+
+    def __str__(self):
+        return f"{self.manufacturer} {self.item_model}"
+
+  
 class DocumentTemplate(models.Model):
     template_id = models.AutoField(primary_key=True)
     display_name = models.CharField(max_length=100, help_text="Name shown to user")
@@ -842,3 +613,97 @@ class DocumentTemplate(models.Model):
 
     def __str__(self):
         return f"{self.display_name} ({'Required' if self.mandatory else 'Optional'})"
+    
+    
+
+
+class GadgetCategory(models.Model):
+    cat_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255, unique=True)
+    parent = models.IntegerField(null=True, blank=True)
+    details = models.CharField(max_length=255, blank=True, null=True)
+    created_by = models.IntegerField(blank=True, null=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(blank=True, null=True)
+    inactive = models.BooleanField(default=False)
+    removed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'sa_gadget_category'
+        app_label = 'control_panel'
+
+    def __str__(self):
+        return self.name
+
+
+class GadgetItem(models.Model):
+    item_id = models.AutoField(primary_key=True)
+    category = models.ForeignKey(GadgetCategory, on_delete=models.PROTECT, null=True, blank=True)
+    title = models.CharField(max_length=100)
+    info = models.TextField(blank=True, null=True)
+    model_code = models.CharField(max_length=100, null=True, blank=True)
+    cost = models.DecimalField(max_digits=10, decimal_places=2)
+    available_stock = models.IntegerField(blank=True, null=True)
+    images = models.JSONField(blank=True, null=True)
+    disabled = models.BooleanField(default=False)
+    soft_deleted = models.BooleanField(default=False)
+    added_on = models.DateTimeField(auto_now_add=True)
+    added_by = models.IntegerField(blank=True, null=True)
+    modified_on = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'sa_gadget_item'
+        app_label = 'control_panel'
+
+    def __str__(self):
+        return self.title
+
+
+class ItemSerial(models.Model):
+    serial_id = models.AutoField(primary_key=True)
+    item = models.ForeignKey(GadgetItem, on_delete=models.PROTECT, null=True, blank=True)
+    serial_code = models.CharField(max_length=255, unique=True)
+    assigned_user = models.IntegerField(null=True, blank=True)
+    deactivated = models.BooleanField(blank=True, null=True)
+    deleted = models.BooleanField(default=False)
+    created_by = models.IntegerField(blank=True, null=True)
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'sa_item_serial'
+        app_label = 'control_panel'
+
+    def __str__(self):
+        return self.serial_code
+
+
+class GadgetPurchase(models.Model):
+    purchase_id = models.AutoField(primary_key=True)
+    item = models.ForeignKey(GadgetItem, on_delete=models.PROTECT, null=True, blank=True)
+    buyer_name = models.CharField(max_length=255, null=True, blank=True)
+    buyer_phone = models.CharField(max_length=255, null=True, blank=True)
+    per_unit_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    grand_total = models.DecimalField(max_digits=10, decimal_places=2)
+    ordered_qty = models.IntegerField()
+    remaining_qty = models.IntegerField(blank=True, null=True)
+    allocated_serials = models.JSONField(null=True, blank=True)
+    order_ref = models.CharField(max_length=100, unique=True)
+    tracking_no = models.CharField(max_length=100, null=True, blank=True)
+    shipping_partner = models.CharField(max_length=100, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=[('PENDING', 'Pending'), ('APPROVED', 'Approved'),
+                                                     ('PARTIALLY APPROVED', 'Partially Approved'),
+                                                     ('REJECTED', 'Rejected'), ('CANCELLED', 'Cancelled')],
+                              default='PENDING')
+    expected_delivery = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    initiated_by = models.IntegerField(blank=True, null=True)
+    initiated_on = models.DateTimeField(auto_now_add=True)
+    modified_on = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'sa_gadget_purchase'
+        app_label = 'control_panel'
+
+    def __str__(self):
+        return self.order_ref

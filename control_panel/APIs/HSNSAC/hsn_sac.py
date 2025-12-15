@@ -1,5 +1,3 @@
-from datetime import timezone
-from web_portal.models import AdminActivityLog
 from ...views import*
 
 

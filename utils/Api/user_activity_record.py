@@ -1,6 +1,7 @@
 from rest_framework.response import Response
 from rest_framework import status
-from control_panel.models import*
+from admin_hub.models import *
+
 
 def record_member_activity(activity_data: dict):
     try:

@@ -1,4 +1,3 @@
-# Database creation utility (completely rewritten)
 import psycopg2
 from django.conf import settings
 from django.db import connections
@@ -26,12 +25,11 @@ def setup_admin_database(db_identifier):
         cursor.close()
         conn.close()
 
-        # Register in Django settings dynamically
         settings.DATABASES[db_identifier] = {
             **settings.DATABASES['default'],
             'NAME': db_identifier,
         }
-        connections.databases = settings.DATABASES  # Refresh connection pool
+        connections.databases = settings.DATABASES  
 
         if not hasattr(settings, 'TENANT_DATABASES'):
             settings.TENANT_DATABASES = []
