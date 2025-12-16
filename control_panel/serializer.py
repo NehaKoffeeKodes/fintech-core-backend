@@ -726,3 +726,97 @@ class PurchaseRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = GadgetPurchase
         exclude = ["initiated_by", "modified_on"]
+        
+        
+
+class ChargeRuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChargeRule
+        fields = '__all__'
+        read_only_fields = ('created_on', 'modified_on', 'modified_by', 'soft_deleted')
+        
+
+
+
+class CostEntrySerializer(serializers.ModelSerializer):
+    document_urls = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CostEntry
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at', 'created_by', 'updated_by', 'entry_id')
+
+    def get_document_urls(self, obj):
+        request = self.context.get('request')
+        if not request or not obj.documents:
+            return []
+
+        base_url = f"{ 'https' if request.is_secure() else 'http' }://{request.get_host()}{settings.MEDIA_URL}"
+        return [f"{base_url}{path.lstrip('/')}" for path in obj.documents]
+    
+    
+
+class ChargeCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChargeCategory
+        fields = '__all__'
+        read_only_fields = ('added_on', 'modified_on', 'added_by')
+
+    def validate_category_name(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Category name is required and cannot be empty.")
+
+        queryset = ChargeCategory.objects.filter(category_name__iexact=value.strip(), is_removed=False)
+        
+        if self.instance:
+            queryset = queryset.exclude(category_id=self.instance.category_id)
+        
+        if queryset.exists():
+            raise serializers.ValidationError("A category with this name already exists.")
+        
+        return value.strip()
+    
+    
+
+class LimitConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LimitConfig
+        fields = '__all__'
+        read_only_fields = ['rule_id']
+        
+        
+
+class GlobalBankInstitutionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GlobalBankInstitution
+        exclude = ['added_on']
+        
+
+      
+
+class GadgetItemSerializer(serializers.ModelSerializer):
+    image_full_url = serializers.SerializerMethodField(read_only=True)
+    added_date_formatted = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = GadgetItem
+        exclude = ['modified_at', 'added_by', 'item_image']  
+
+    def get_image_full_url(self, obj):
+        request = self.context.get('request')
+        if not request or not obj.item_image:
+            return None
+
+        image_path = obj.item_image.get('gadget_image')
+        if not image_path:
+            return None
+        
+        clean_path = str(image_path).replace('\\', '/')
+        scheme = 'https' if request.is_secure() else 'http'
+        return f"{scheme}://{request.get_host()}/media/{clean_path}"
+
+    def get_added_date_formatted(self, obj):
+        if not obj.added_at:
+            return None
+
+        return obj.added_at.strftime("%d-%m-%Y %I:%M %p")

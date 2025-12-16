@@ -493,7 +493,7 @@ class DmtTransferClient(models.Model):
 
     class Meta:
         db_table = 'client_money_transfer'
-        app_label = 'customers'
+        app_label = 'admin_hub'
         ordering = ['-joined_on']
         
         
@@ -542,7 +542,7 @@ class GovernmentChargeLog(models.Model):
 
     class Meta:
         db_table = 'govt_charge_entries'
-        app_label = 'charges'
+        app_label = 'admin_hub'
         ordering = ['-recorded_at']
         verbose_name = "Government Levy Entry"
         verbose_name_plural = "Government Levy Entries"
@@ -567,7 +567,7 @@ class GlobalBankList(models.Model):
 
     class Meta:
         db_table = 'master_banks'
-        app_label = 'master'
+        app_label = 'admin_hub'
         ordering = ['full_name']
         verbose_name = "Global Bank Master"
         verbose_name_plural = "Global Bank Masters"
@@ -637,7 +637,7 @@ class DmtBankAccount(models.Model):
 
     class Meta:
         db_table = 'bank_beneficiary'
-        app_label = 'customers'
+        app_label = 'admin_hub'
         unique_together = ('account_number', 'ifsc_code')
         ordering = ['-added_on']
                
@@ -689,7 +689,7 @@ class MoneyTransferLog(models.Model):
 
     class Meta:
         db_table = 'txn_money_transfer'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class PaymentGatewayRecord(models.Model):
@@ -718,7 +718,7 @@ class PaymentGatewayRecord(models.Model):
 
     class Meta:
         db_table = 'txn_pg_gateway'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class RechargeHistory(models.Model):
@@ -741,7 +741,7 @@ class RechargeHistory(models.Model):
 
     class Meta:
         db_table = 'txn_mobile_recharge'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class FundTransferEntry(models.Model):
@@ -771,7 +771,7 @@ class FundTransferEntry(models.Model):
 
     class Meta:
         db_table = 'txn_fund_transfer'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
 
 class CashfreeKycProfile(models.Model):
@@ -790,7 +790,7 @@ class CashfreeKycProfile(models.Model):
 
     class Meta:
         db_table = 'kyc_cashfree_profiles'
-        app_label = 'customers'
+        app_label = 'admin_hub'
         ordering = ['-added_on']
         verbose_name = "Cashfree KYC Customer"
         verbose_name_plural = "Cashfree KYC Customers"
@@ -812,7 +812,7 @@ class BillPaymentRecord(models.Model):
 
     class Meta:
         db_table = 'txn_bbps_bill'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class CashfreePaymentLog(models.Model):
@@ -833,7 +833,7 @@ class CashfreePaymentLog(models.Model):
 
     class Meta:
         db_table = 'txn_cashfree_pg'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class PhonePePaymentEntry(models.Model):
@@ -851,7 +851,7 @@ class PhonePePaymentEntry(models.Model):
 
     class Meta:
         db_table = 'txn_phonepe'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
 
 
@@ -865,7 +865,7 @@ class ElectricityCategory(models.Model):
 
     class Meta:
         db_table = 'utility_electricity_boards'
-        app_label = 'utilities'
+        app_label = 'admin_hub'
         ordering = ['board_name']
         verbose_name = "Electricity Board Category"
         verbose_name_plural = "Electricity Board Categories"
@@ -888,7 +888,7 @@ class AadhaarVerifyLog(models.Model):
 
     class Meta:
         db_table = 'txn_aadhaar_verify'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class ElectricityBillEntry(models.Model):
@@ -910,7 +910,7 @@ class ElectricityBillEntry(models.Model):
 
     class Meta:
         db_table = 'txn_electricity'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
 
 
 
@@ -924,7 +924,7 @@ class GasCategory(models.Model):
 
     class Meta:
         db_table = 'utility_gas_companies'
-        app_label = 'utilities'
+        app_label = 'admin_hub'
         ordering = ['company_name']
         verbose_name = "Gas Company Category"
         verbose_name_plural = "Gas Company Categories"
@@ -952,7 +952,7 @@ class GasBillEntry(models.Model):
 
     class Meta:
         db_table = 'txn_gas_bill'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class LicPremiumEntry(models.Model):
@@ -973,7 +973,7 @@ class LicPremiumEntry(models.Model):
 
     class Meta:
         db_table = 'txn_lic_premium'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
    
    
    
@@ -991,7 +991,7 @@ class AepsBankList(models.Model):
 
     class Meta:
         db_table = 'bank_aeps_list'
-        app_label = 'banks'
+        app_label = 'admin_hub'
         ordering = ['bank_name']
         verbose_name = "AEPS Supported Bank"
         verbose_name_plural = "AEPS Supported Banks"
@@ -1024,10 +1024,50 @@ class AepsCashLog(models.Model):
 
     class Meta:
         db_table = 'txn_aeps_cash'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
 
 
+class ServiceIdentifier(models.Model):
+    mapping_id = models.AutoField(primary_key=True)
+    provider = models.ForeignKey(AdServiceProvider, on_delete=models.PROTECT, null=True)
+    config_data = models.JSONField(null=True, blank=True)
+    last_updated = models.DateTimeField(auto_now=True, null=True, blank=True)
+    updated_by = models.ForeignKey(PortalUser, on_delete=models.PROTECT, db_column='updated_by', null=True)
+    deactivated = models.BooleanField(default=False)
+    soft_deleted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"ProviderMapping {self.mapping_id}"
+
+    class Meta:
+        db_table = "service_identifier"
+        app_label = 'admin_hub'
+        
+
+
+
+class GlobalBankInstitution(models.Model):
+    institution_id = models.AutoField(primary_key=True)
+    full_name = models.CharField(max_length=255, null=True, blank=True)
+    short_code = models.CharField(max_length=50, null=True, blank=True)
+    universal_ifsc = models.CharField(max_length=15, null=True, blank=True)
+    fino_mapping = models.JSONField(null=True, blank=True)
+    nsdl_mapping = models.JSONField(null=True, blank=True)
+    airtel_mapping = models.JSONField(null=True, blank=True)
+    supports_payout = models.BooleanField(default=False)
+    supports_funding = models.BooleanField(default=False)
+    is_inactive = models.BooleanField(default=True)
+    added_on = models.DateTimeField(auto_now_add=True)
+    modified_on = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        db_table = 'master_institutions'
+        app_label = 'admin_hub'
+
+    def __str__(self):
+        return self.full_name or "Unnamed Bank"
+          
 
 class BulkPeClientInfo(models.Model):
     client_id = models.AutoField(primary_key=True)
@@ -1042,7 +1082,7 @@ class BulkPeClientInfo(models.Model):
 
     class Meta:
         db_table = 'bulkpe_clients'
-        app_label = 'bulkpe'
+        app_label = 'admin_hub'
         ordering = ['-registered_on']
         verbose_name = "Bulk PE Customer"
 
@@ -1066,7 +1106,7 @@ class BulkPeCardInfo(models.Model):
 
     class Meta:
         db_table = 'bulkpe_cards'
-        app_label = 'bulkpe'
+        app_label = 'admin_hub'
         ordering = ['-added_on']
 
     def __str__(self):
@@ -1089,7 +1129,7 @@ class BulkPeBeneficiaryInfo(models.Model):
 
     class Meta:
         db_table = 'bulkpe_beneficiaries'
-        app_label = 'bulkpe'
+        app_label = 'admin_hub'
         unique_together = ('owner', 'account_number', 'ifsc_code')
         ordering = ['-added_on']
 
@@ -1117,7 +1157,7 @@ class BulkPayoutRecord(models.Model):
 
     class Meta:
         db_table = 'txn_bulk_payout'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class AirtelBillEntry(models.Model):
@@ -1140,7 +1180,7 @@ class AirtelBillEntry(models.Model):
 
     class Meta:
         db_table = 'txn_airtel_cms'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
     
 class BankItAepsRecord(models.Model):
@@ -1159,7 +1199,7 @@ class BankItAepsRecord(models.Model):
 
     class Meta:
         db_table = 'txn_bankit_aeps'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class MicroAtmEntry(models.Model):
@@ -1176,7 +1216,7 @@ class MicroAtmEntry(models.Model):
 
     class Meta:
         db_table = 'txn_micro_atm'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 class PpiTransferLog(models.Model):
@@ -1196,7 +1236,7 @@ class PpiTransferLog(models.Model):
 
     class Meta:
         db_table = 'txn_ppi_transfer'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
   
  
 
@@ -1220,7 +1260,7 @@ class KhataClient(models.Model):
 
     class Meta:
         db_table = 'khata_clients'
-        app_label = 'digikhata'
+        app_label = 'admin_hub'
         ordering = ['-joined_on']
 
     def __str__(self):
@@ -1246,7 +1286,7 @@ class KhataBankAccount(models.Model):
 
     class Meta:
         db_table = 'khata_bank_accounts'
-        app_label = 'digikhata'
+        app_label = 'admin_hub'
         unique_together = ('account_number', 'ifsc_code')
 
     def __str__(self):
@@ -1281,7 +1321,7 @@ class KhataTransferEntry(models.Model):
 
     class Meta:
         db_table = 'txn_digikhata'
-        app_label = 'transactions'
+        app_label = 'admin_hub'
         
         
 

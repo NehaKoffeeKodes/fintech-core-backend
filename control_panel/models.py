@@ -590,6 +590,32 @@ class ProductItem(models.Model):
     def __str__(self):
         return f"{self.manufacturer} {self.item_model}"
 
+
+
+class LimitConfig(models.Model):
+    rule_id = models.AutoField(primary_key=True)
+    admin = models.ForeignKey(Admin, on_delete=models.PROTECT, null=True, blank=True)
+    provider = models.ForeignKey(ServiceProvider, on_delete=models.PROTECT, null=True, blank=True)
+    
+    max_per_transaction = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    max_daily_total = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
+    max_monthly_total = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    
+    max_daily_transactions = models.PositiveIntegerField(null=True, blank=True)
+    max_monthly_transactions = models.PositiveIntegerField(null=True, blank=True)
+    
+    is_enabled = models.BooleanField(default=True)
+    valid_from = models.DateTimeField(null=True, blank=True)
+    valid_until = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'limit_config'
+        app_label = 'control_panel'
+
+
+    def __str__(self):
+        return f"Rule {self.rule_id} - User: {self.user_account} | Provider: {self.provider}"
+    
   
 class DocumentTemplate(models.Model):
     template_id = models.AutoField(primary_key=True)
@@ -616,6 +642,47 @@ class DocumentTemplate(models.Model):
     
     
 
+
+class CostEntry(models.Model):
+    PAYMENT_METHOD_CHOICES = [
+        ('card', 'Card Payment'),
+        ('transfer', 'Bank Transfer'),
+        ('cash', 'Cash'),
+        ('digital', 'Digital Payment'),
+        ('misc', 'Miscellaneous'),
+    ]
+
+    TAX_STATUS_CHOICES = [
+        ('with_tax', 'With Tax'),
+        ('without_tax', 'Without Tax'),
+    ]
+
+    entry_id = models.AutoField(primary_key=True)
+    entry_date = models.DateTimeField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    receipt_number = models.CharField(max_length=100, blank=True, null=True)
+    tax_status = models.CharField(max_length=20, choices=TAX_STATUS_CHOICES)
+    tax_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    tax_value = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    vendor_name = models.CharField(max_length=200, blank=True, null=True)
+    vendor_gst = models.CharField(max_length=50, blank=True, null=True)
+    notes = models.TextField()
+    documents = models.JSONField(null=True, blank=True)  
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(AdminAccount, related_name='costs_created', on_delete=models.PROTECT)
+    updated_at = models.DateTimeField(null=True, blank=True)
+    updated_by = models.ForeignKey(AdminAccount, related_name='costs_updated', on_delete=models.PROTECT, null=True, blank=True)
+    is_removed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'finance_cost_entries'
+        ordering = ['-entry_date']
+
+    def __str__(self):
+        return f"Cost #{self.entry_id} - {self.entry_date.strftime('%d %b %Y')}"
+    
+    
 
 class GadgetCategory(models.Model):
     cat_id = models.AutoField(primary_key=True)
@@ -658,6 +725,27 @@ class GadgetItem(models.Model):
     def __str__(self):
         return self.title
 
+
+
+
+class ChargeCategory(models.Model):
+    category_id = models.AutoField(primary_key=True)
+    category_name = models.CharField(max_length=100, unique=True)
+    added_on = models.DateTimeField(auto_now_add=True)
+    modified_on = models.DateTimeField(null=True, blank=True)
+    added_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,related_name='charge_categories_created')
+    is_removed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'master_charge_categories'
+        ordering = ['-category_id']
+        verbose_name = 'Charge Category'
+        verbose_name_plural = 'Charge Categories'
+
+    def __str__(self):
+        return self.category_name
+    
+    
 
 class ItemSerial(models.Model):
     serial_id = models.AutoField(primary_key=True)
