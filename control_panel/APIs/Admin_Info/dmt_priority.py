@@ -1,6 +1,6 @@
 from ...views import *
 
-class ServiceRoutingControlView(APIView):
+class DmtPriorityView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin]
 

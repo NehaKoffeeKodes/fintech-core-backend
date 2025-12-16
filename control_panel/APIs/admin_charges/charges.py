@@ -1,6 +1,6 @@
 from ...views import*
 
-class FeeManagementAPIView(APIView):
+class ChargeManagementAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

@@ -1,6 +1,6 @@
 from ...views import*
 
-class TransactionRuleManagementView(APIView):
+class LimitConfigRuleView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin]
 
