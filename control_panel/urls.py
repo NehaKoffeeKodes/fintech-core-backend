@@ -1,4 +1,5 @@
 from django.urls import path
+from control_panel.APIs.Admin_Info.a_credentials import *
 from control_panel.APIs.Admin_Info.admin_static import *
 from control_panel.APIs.Admin_Info.bank_verification import *
 from control_panel.APIs.Admin_Info.change_pass_word import *
@@ -16,7 +17,11 @@ from control_panel.APIs.Admin_Info.gst_tax_verification import*
 from control_panel.APIs.Admin_Info.s_admin_other_charges import *
 from control_panel.APIs.Admin_Info.required_documents_list import *
 from control_panel.APIs.State.state_create import StateAPIView
-from control_panel.send_otp import SendOTPEmailAPI
+from control_panel.APIs.Device_booking.device import *
+from control_panel.APIs.Product_Item.product import *
+from control_panel.APIs.Product_category.productitem_category import *
+from control_panel.APIs.Sa_service.service import *
+from control_panel.send_otp import *
 
 
 urlpatterns = [
@@ -49,6 +54,10 @@ urlpatterns = [
     #Fund_REQUEST
     path('manage-fund-requests/',ManageFundRequestsView.as_view()),
     
+    #credentials
+    path('sms-settings/',SMSSettingsView.as_view()),
+    path('email-settings/',EmailSettingsView.as_view()),
+    
     #bank_account_verification
     path('bankaccount-verification/',BankAccountVerificationView.as_view()),
     
@@ -68,5 +77,25 @@ urlpatterns = [
     path('api/send-otp-email/', SendOTPEmailAPI.as_view(), name='send-otp-email'),
     
     #ADMIN_STATIC
-    path('admin-summary/',DashboardSummaryView.as_view()),
+    path('admin-static/',DashboardSummaryView.as_view()),
+    
+    #PRODUCT_CATEGORY
+    path('category-management/',CategoryManagementView.as_view()),
+    
+    #product_item
+    path("product-management/",ProductManagementView.as_view()),
+    
+    #service_provider
+    path('service-config-management/',ServiceConfigManagementView.as_view()),
+    
+    #device
+    path('gadget-purchase/',GadgetPurchaseAPIView.as_view()),
+    
+    #views
+    path('create-order',CreateOrderManager.as_view()),
+    path('auth/',AuthView.as_view()),
+    path('beneficiary-manage/',BeneficiaryManager.as_view()),
+    path('fund-transfer/',FundTransferView.as_view()),
+    path('dmt-ppi/',DMTPPIView.as_view()),
+    
 ]

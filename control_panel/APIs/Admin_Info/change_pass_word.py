@@ -127,19 +127,18 @@ class UpdatePasswordView(APIView):
                     </p>
 
                     <div style="text-align:center; margin:30px 0;">
-                        <a href="https://tapicashless.com/support" 
                            style="background:#111827; color:white; padding:12px 28px; text-decoration:none; border-radius:8px; font-weight:600;">
                             Contact Security Team
                         </a>
                     </div>
 
                     <p style="font-size:13px; color:#6b7280;">
-                        Stay safe,<br><strong>TAPI Cashless Security</strong>
+                        Stay safe,<br><strong>Fintech Security</strong>
                     </p>
                 </div>
 
                 <div style="background:#1f2937; color:#9ca3af; text-align:center; padding:16px; font-size:12px;">
-                    This is an automated security notification • © 2025 TAPI Cashless Pvt Ltd
+                    This is an automated security notification • © 2025 Fintech Pvt Ltd
                 </div>
             </div>
         </div>

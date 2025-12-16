@@ -13,11 +13,12 @@ class SMSSettingsView(APIView):
             all_sms = SMSAccount.objects.all().order_by('-sms_id')
             if search:
                 all_sms = all_sms.filter(
-                    Q(action_type__icontains=search) |
-                    Q(sms_api_key__icontains=search) |
-                    Q(sms_sender_id__icontains=search) |
-                    Q(sms_pe_id__icontains=search)
+                    Q(action__icontains=search) |
+                    Q(api_key__icontains=search) |
+                    Q(sender__icontains=search) |
+                    Q(pe_id__icontains=search)
                 )
+
 
             final_list = []
 
@@ -47,7 +48,7 @@ class SMSSettingsView(APIView):
 
             return Response({
                 "status": "success",
-                "message": "SMS settings mil gaye",
+                "message": "SMS settings is found successfully!",
                 "data": {
                     "total_items": total,
                     "total_pages": total_pages,
@@ -134,7 +135,7 @@ class EmailSettingsView(APIView):
 
             return Response({
                 "status": "success",
-                "message": "Email settings mil gaye",
+                "message": "Email settings is found successfully!",
                 "data": {
                     "total": total,
                     "pages": total_pages,
@@ -184,7 +185,7 @@ class EmailSettingsView(APIView):
                     </div>
 
                     <p style="color:#e74c3c;">Yeh code <strong>10 minute</strong> mein expire ho jayega.</p>
-                    <p style="color:#7f8c8d; font-size:14px;">Agar aapne yeh request nahi ki, toh is email ko ignore kar den.</p>
+                    <p style="color:#7f8c8d; font-size:14px;">If you did not make this request, please ignore this email.</p>
                     
                     <hr style="margin:30px 0; border:none; border-top:1px solid #eee;">
                     <p style="text-align:center; color:#95a5a6; font-size:13px;">

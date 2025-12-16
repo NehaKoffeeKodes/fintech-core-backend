@@ -22,7 +22,7 @@ class FeeManagementAPIView(APIView):
 
     def add_new_fee(self, request):
         save_api_log(request, "OwnAPI", request.data, {"status": "in_progress"}, None,
-                            service_type="SuperAdmin Fee Creation", client_override="tcpl_db")
+                            service_type="SuperAdmin Fee Creation", client_override="fintech_backend_db")
         try:
             serializer = ChargesRuleSerializer(data=request.data, context={'request': request})
             if serializer.is_valid():
@@ -40,7 +40,7 @@ class FeeManagementAPIView(APIView):
                     )
 
                 save_api_log(request, "OwnAPI", request.data, {"status": "success", "data": serializer.data},
-                                    None, service_type="SuperAdmin Fee Creation", client_override="tcpl_db")
+                                    None, service_type="SuperAdmin Fee Creation", client_override="fintech_backend_db")
 
                 return Response({
                     'status': 'success',
@@ -48,14 +48,14 @@ class FeeManagementAPIView(APIView):
                 }, status=status.HTTP_201_CREATED)
             else:
                 save_api_log(request, "OwnAPI", request.data, {"status": "validation_failed", "errors": serializer.errors},
-                                    None, service_type="SuperAdmin Fee Creation", client_override="tcpl_db")
+                                    None, service_type="SuperAdmin Fee Creation", client_override="fintech_backend_db")
                 return Response({
                     'status': 'fail',
                     'message': serializer.errors
                 }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
             save_api_log(request, "OwnAPI", request.data, {"status": "failed", "error": str(exc)},
-                                None, service_type="SuperAdmin Fee Creation", client_override="tcpl_db")
+                                None, service_type="SuperAdmin Fee Creation", client_override="fintech_backend_db")
             return Response({
                 'status': 'error',
                 'message': str(exc)
@@ -126,7 +126,7 @@ class FeeManagementAPIView(APIView):
     def put(self, request):
         fee_id = request.data.get('charges_id')
         save_api_log(request, "OwnAPI", request.data, {"status": "in_progress"}, None,
-                            service_type="SuperAdmin Fee Update", client_override="tcpl_db")
+                            service_type="SuperAdmin Fee Update", client_override="fintech_backend_db")
 
         if not fee_id:
             return Response({
@@ -154,7 +154,7 @@ class FeeManagementAPIView(APIView):
                     )
 
                 save_api_log(request, "OwnAPI", request.data, {"status": "success", "data": serializer.data},
-                                    None, service_type="SuperAdmin Fee Update", client_override="tcpl_db")
+                                    None, service_type="SuperAdmin Fee Update", client_override="fintech_backend_db")
 
                 return Response({
                     'status': 'success',
@@ -162,7 +162,7 @@ class FeeManagementAPIView(APIView):
                 }, status=status.HTTP_200_OK)
             else:
                 save_api_log(request, "OwnAPI", request.data, {"status": "validation_failed", "errors": serializer.errors},
-                                    None, service_type="SuperAdmin Fee Update", client_override="tcpl_db")
+                                    None, service_type="SuperAdmin Fee Update", client_override="fintech_backend_db")
                 return Response({
                     'status': 'fail',
                     'message': serializer.errors
@@ -175,7 +175,7 @@ class FeeManagementAPIView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:
             save_api_log(request, "OwnAPI", request.data, {"status": "failed", "error": str(exc)},
-                                None, service_type="SuperAdmin Fee Update", client_override="tcpl_db")
+                                None, service_type="SuperAdmin Fee Update", client_override="fintech_backend_db")
             return Response({
                 'status': 'error',
                 'message': str(exc)
@@ -184,7 +184,7 @@ class FeeManagementAPIView(APIView):
     def delete(self, request):
         fee_id = request.data.get('charges_id')
         save_api_log(request, "OwnAPI", request.data, {"status": "in_progress"}, None,
-                            service_type="SuperAdmin Fee Delete", client_override="tcpl_db")
+                            service_type="SuperAdmin Fee Delete", client_override="fintech_backend_db")
 
         if not fee_id:
             return Response({
@@ -207,7 +207,7 @@ class FeeManagementAPIView(APIView):
             )
 
             save_api_log(request, "OwnAPI", request.data, {"status": "success"},
-                                None, service_type="SuperAdmin Fee Delete", client_override="tcpl_db")
+                                None, service_type="SuperAdmin Fee Delete", client_override="fintech_backend_db")
 
             return Response({
                 'status': 'success',
@@ -221,7 +221,7 @@ class FeeManagementAPIView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:
             save_api_log(request, "OwnAPI", request.data, {"status": "failed", "error": str(exc)},
-                                None, service_type="SuperAdmin Fee Delete", client_override="tcpl_db")
+                                None, service_type="SuperAdmin Fee Delete", client_override="fintech_backend_db")
             return Response({
                 'status': 'error',
                 'message': str(exc)

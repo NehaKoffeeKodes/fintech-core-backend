@@ -78,7 +78,7 @@ class ServiceConfigManagementView(APIView):
             new_desc = request.data.get('description')
 
             save_api_log(request, "OwnAPI", request.data, {"status": "in_progress"}, None,
-                                service_type="Core Service Update", client_override="tcpl_db")
+                                service_type="Core Service Update", client_override="fintech_backend_db")
 
             if not svc_id:
                 return Response({
@@ -115,7 +115,7 @@ class ServiceConfigManagementView(APIView):
                 success_msg = f'Service {action} successfully.'
 
                 save_api_log(request, "OwnAPI", request.data, {"status": "success", "message": success_msg},
-                                    None, service_type="Core Service Update", client_override="tcpl_db")
+                                    None, service_type="Core Service Update", client_override="fintech_backend_db")
 
                 return Response({
                     'status': 'success',
@@ -129,7 +129,7 @@ class ServiceConfigManagementView(APIView):
 
         except Exception as exc:
             save_api_log(request, "OwnAPI", request.data, {"status": "failed", "error": str(exc)},
-                                None, service_type="Core Service Update", client_override="tcpl_db")
+                                None, service_type="Core Service Update", client_override="fintech_backend_db")
             return Response({
                 'status': 'error',
                 'message': 'Update failed due to server error.',

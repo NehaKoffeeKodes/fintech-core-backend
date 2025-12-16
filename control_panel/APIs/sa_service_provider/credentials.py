@@ -15,7 +15,7 @@ class UpdateProviderSettingsView(APIView):
             request, "OwnAPI", request.data,
             {"status": "processing"}, None,
             service_type="Service Provider Update",
-            client_override="tcpl_db"
+            client_override="fintech_backend_db"
         )
 
         try:
@@ -78,7 +78,7 @@ class UpdateProviderSettingsView(APIView):
                 request, "OwnAPI", request.data,
                 {"status": "success"}, None,
                 service_type="Service Provider Update",
-                client_override="tcpl_db"
+                client_override="fintech_backend_db"
             )
 
             return Response(
@@ -98,7 +98,7 @@ class UpdateProviderSettingsView(APIView):
                 request, "OwnAPI", request.data,
                 {"status": "error", "message": str(ve)}, None,
                 service_type="Service Provider Update",
-                client_override="tcpl_db"
+                client_override="fintech_backend_db"
             )
             return Response(
                 {"status": "fail", "message": str(ve)},
@@ -111,7 +111,7 @@ class UpdateProviderSettingsView(APIView):
                 request, "OwnAPI", request.data,
                 {"status": "error", "message": f"Server error: {error_message}"}, None,
                 service_type="Service Provider Update",
-                client_override="tcpl_db"
+                client_override="fintech_backend_db"
             )
             return Response(
                 {"status": "error", "message": "An internal server error occurred."},

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title|default:"Payment Gateway" }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .info-message {
+            color: #27ae60;
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        .loading {
+            margin: 30px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        input[type="submit"] {
+            background-color: #3498db;
+            color: white;
+            padding: 14px 32px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        input[type="submit"]:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ page_title|default:"Secure Payment" }}</h1>
+
+        {% if message %}
+            <p class="info-message">{{ message }}</p>
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+            <p>{{ info|default:"Please wait while we redirect you..." }}</p>
+        {% else %}
+            <p>Click the button below to proceed with your transaction.</p>
+            
+            <form method="post" action="https://uat.paysprint.in/wallet-money/">
+                <textarea name="encdata" style="display:none;">
+6qqwi796kW/G3zkyhgxTbYhEH+XgPZsCR7Ulun/4VKojr3jWZ35XP0iFoBTtraNCrWlYid5/v1ZiASytsyMzMAfRSqPTWdVbb0i6BuvWW1j/TZsmFTmrHTeb1bTNHIWqbBDRglISw9yUWOd/62JFWwvuUo6KcL5AikJsyT0Kyx9IiN/Gw/simASwj/jqjXJjb1Z0jNRLyi5QxvjG+dkHQdUaYAnzCJLRMzoxE+PnOlG6HOyfRGEB0tR6WOC8NAw1i9/wLe/U9G9R6nBvH6cXzCQwRCoFR3+QHhbvdOHVPZCibE2U26DtjhxytjrPkviOMXr70Xo7gAzKP2V+5G/3HrpyXP0k5DNpVcafhlgWJtasMA3/f7b5Qdky1quJ+yGMrbbb5xSM3vvS9t2FgswdcQ==
+                </textarea>
+                <input type="submit" value="{{ submit_button_text|default:'Proceed to Payment' }}">
+            </form>
+        {% endif %}
+    </div>
+</body>
+</html>

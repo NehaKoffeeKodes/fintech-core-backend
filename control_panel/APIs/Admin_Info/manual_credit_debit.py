@@ -50,7 +50,7 @@ class AdminWalletAdjustmentView(APIView):
             save_api_log(
                 request, "OwnAPI", request.data,
                 {"status": "error", "error": str(e)},
-                None, service_type="Admin Wallet Adjustment", client_override="tcpl_db"
+                None, service_type="Admin Wallet Adjustment", client_override="fintech_backend_db"
             )
             return Response({
                 "status": "error",
@@ -63,7 +63,7 @@ class AdminWalletAdjustmentView(APIView):
         txn_ref = request.data.get('transaction_id')
 
         save_api_log(request, "OwnAPI", request.data, {"status": "processing"}, None,
-                            service_type="Fetch Reversal Amount", client_override="tcpl_db")
+                            service_type="Fetch Reversal Amount", client_override="fintech_backend_db")
 
         if not all([sp_id, admin_id, txn_ref]):
             return Response({"status": "fail", "message": "Missing required fields"}, status=400)
@@ -120,7 +120,7 @@ class AdminWalletAdjustmentView(APIView):
                 })
 
             save_api_log(request, "OwnAPI", request.data, {"status": "success"}, None,
-                                service_type="Fetch Reversal Amount", client_override="tcpl_db")
+                                service_type="Fetch Reversal Amount", client_override="fintech_backend_db")
 
             return Response({
                 "status": "success",
@@ -130,7 +130,7 @@ class AdminWalletAdjustmentView(APIView):
 
         except Exception as e:
             save_api_log(request, "OwnAPI", request.data, {"status": "error", "msg": str(e)}, None,
-                                service_type="Fetch Reversal Amount", client_override="tcpl_db")
+                                service_type="Fetch Reversal Amount", client_override="fintech_backend_db")
             return Response({"status": "error", "message": str(e)}, status=500)
 
     def process_adjustment(self, request):
@@ -141,7 +141,7 @@ class AdminWalletAdjustmentView(APIView):
         description = request.data.get('description', '')
 
         save_api_log(request, "OwnAPI", request.data, {"status": "processing"}, None,
-                            service_type="Manual Wallet Adjustment", client_override="tcpl_db")
+                            service_type="Manual Wallet Adjustment", client_override="fintech_backend_db")
 
         try:
             admin = Admin.objects.get(admin_id=admin_id)
@@ -180,7 +180,7 @@ class AdminWalletAdjustmentView(APIView):
                     )
 
                 save_api_log(request, "OwnAPI", request.data, {"status": "success"}, None,
-                                    service_type="Manual Wallet Adjustment", client_override="tcpl_db")
+                                    service_type="Manual Wallet Adjustment", client_override="fintech_backend_db")
                 return Response({
                     "status": "success",
                     "message": f"Wallet {charge_type} successful"
@@ -240,7 +240,7 @@ class AdminWalletAdjustmentView(APIView):
             ).update(is_deleted=True)
 
             save_api_log(request, "OwnAPI", request.data, {"status": "success"}, None,
-                                service_type="Transaction Reversal", client_override="tcpl_db")
+                                service_type="Transaction Reversal", client_override="fintech_backend_db")
 
             return Response({
                 "status": "success",
@@ -249,5 +249,5 @@ class AdminWalletAdjustmentView(APIView):
 
         except Exception as e:
             save_api_log(request, "OwnAPI", request.data, {"status": "error", "msg": str(e)}, None,
-                                service_type="Wallet Adjustment", client_override="tcpl_db")
+                                service_type="Wallet Adjustment", client_override="fintech_backend_db")
             return Response({"status": "error", "message": str(e)}, status=500)

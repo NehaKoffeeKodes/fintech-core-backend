@@ -31,7 +31,7 @@ class GadgetCategoryView(APIView):
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Create Device Category", client_override="tcpl_db"
+                service_type="Create Device Category", client_override="fintech_backend_db"
             )
 
             if not name:
@@ -56,7 +56,7 @@ class GadgetCategoryView(APIView):
 
                 save_api_log(
                     request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Create Device Category", client_override="tcpl_db"
+                    service_type="Create Device Category", client_override="fintech_backend_db"
                 )
 
             return Response({
@@ -67,7 +67,7 @@ class GadgetCategoryView(APIView):
         except Exception as e:
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Create Device Category", client_override="tcpl_db"
+                service_type="Create Device Category", client_override="fintech_backend_db"
             )
             return Response({
                 'status': 'error',
@@ -146,7 +146,7 @@ class GadgetCategoryView(APIView):
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Update Device Category", client_override="tcpl_db"
+                service_type="Update Device Category", client_override="fintech_backend_db"
             )
 
             if not cat_id or not name:
@@ -174,7 +174,7 @@ class GadgetCategoryView(APIView):
 
                 save_api_log(
                     request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Update Device Category", client_override="tcpl_db"
+                    service_type="Update Device Category", client_override="fintech_backend_db"
                 )
 
             return Response({
@@ -190,7 +190,7 @@ class GadgetCategoryView(APIView):
         except Exception as e:
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Update Device Category", client_override="tcpl_db"
+                service_type="Update Device Category", client_override="fintech_backend_db"
             )
             return Response({
                 'status': 'error',
@@ -203,7 +203,7 @@ class GadgetCategoryView(APIView):
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Delete Device Category", client_override="tcpl_db"
+                service_type="Delete Device Category", client_override="fintech_backend_db"
             )
 
             if not cat_id:
@@ -222,7 +222,7 @@ class GadgetCategoryView(APIView):
 
                 save_api_log(
                     request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Delete Device Category", client_override="tcpl_db"
+                    service_type="Delete Device Category", client_override="fintech_backend_db"
                 )
 
             return Response({
@@ -238,7 +238,7 @@ class GadgetCategoryView(APIView):
         except Exception as e:
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Delete Device Category", client_override="tcpl_db"
+                service_type="Delete Device Category", client_override="fintech_backend_db"
             )
             return Response({
                 'status': 'error',
@@ -280,7 +280,7 @@ class ProductView(APIView):
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Create Product", client_override="tcpl_db"
+                service_type="Create Product", client_override="fintech_backend_db"
             )
 
             required_fields = ['category_id', 'price', 'stock_qty', 'model_number']
@@ -307,7 +307,7 @@ class ProductView(APIView):
 
                 save_api_log(
                     request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Create Product", client_override="tcpl_db"
+                    service_type="Create Product", client_override="fintech_backend_db"
                 )
 
             return Response({
@@ -323,7 +323,7 @@ class ProductView(APIView):
         except Exception as e:
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Create Product", client_override="tcpl_db"
+                service_type="Create Product", client_override="fintech_backend_db"
             )
             return Response({
                 'status': 'error',
@@ -397,7 +397,7 @@ class ProductView(APIView):
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Update Product", client_override="tcpl_db"
+                service_type="Update Product", client_override="fintech_backend_db"
             )
 
             if not prod_id:
@@ -431,7 +431,7 @@ class ProductView(APIView):
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "success"}, None,
-                service_type="Update Product", client_override="tcpl_db"
+                service_type="Update Product", client_override="fintech_backend_db"
             )
 
             return Response({
@@ -447,7 +447,7 @@ class ProductView(APIView):
         except Exception as e:
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Update Product", client_override="tcpl_db"
+                service_type="Update Product", client_override="fintech_backend_db"
             )
             return Response({
                 'status': 'error',
@@ -561,7 +561,7 @@ class ItemSerialView(APIView):
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Import Product Serials", client_override="tcpl_db"
+                service_type="Import Product Serials", client_override="fintech_backend_db"
             )
 
             if not product_id or not file:
@@ -612,7 +612,7 @@ class ItemSerialView(APIView):
 
                 save_api_log(
                     request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Import Product Serials", client_override="tcpl_db"
+                    service_type="Import Product Serials", client_override="fintech_backend_db"
                 )
 
             return Response({
@@ -623,7 +623,7 @@ class ItemSerialView(APIView):
         except Exception as e:
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Import Product Serials", client_override="tcpl_db"
+                service_type="Import Product Serials", client_override="fintech_backend_db"
             )
             return Response({
                 'status': 'error',
@@ -689,7 +689,7 @@ class ItemSerialView(APIView):
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Update Serial Number", client_override="tcpl_db"
+                service_type="Update Serial Number", client_override="fintech_backend_db"
             )
 
             if not serial_id:
@@ -715,7 +715,7 @@ class ItemSerialView(APIView):
 
                 save_api_log(
                     request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Update Serial Number", client_override="tcpl_db"
+                    service_type="Update Serial Number", client_override="fintech_backend_db"
                 )
 
             return Response({
@@ -731,7 +731,7 @@ class ItemSerialView(APIView):
         except Exception as e:
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Update Serial Number", client_override="tcpl_db"
+                service_type="Update Serial Number", client_override="fintech_backend_db"
             )
             return Response({
                 'status': 'error',
