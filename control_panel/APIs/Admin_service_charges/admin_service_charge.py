@@ -8,8 +8,6 @@ class ServiceChargesManagementView(APIView):
     def post(self, request):
         try:
             payload = request.data
-
-            # Extract and validate core parameters
             admin_identifier = payload.get('admin_id')
             page_num = int(payload.get('page_number', 1))
             page_sz = int(payload.get('page_size', 10))
@@ -20,7 +18,6 @@ class ServiceChargesManagementView(APIView):
             from_date = payload.get('start_date')
             to_date = payload.get('end_date', str(datetime.now().date()))
 
-            # Mandatory validations
             if not admin_identifier or not str(admin_identifier).isdigit():
                 return self._bad_request("Valid admin_id is required and must be numeric.")
 
@@ -28,13 +25,11 @@ class ServiceChargesManagementView(APIView):
                 return self._bad_request("page_size and page_number must be positive integers.")
 
             admin_identifier = int(admin_identifier)
-
-            # Optional numeric field validation
+            
             for val, field_name in [(provider_id, 'sp_id'), (svc_id, 'service_id'), (hsn_id, 'hsn_sac_id')]:
                 if val is not None and not str(val).isdigit():
                     return self._bad_request(f"{field_name} must be numeric if provided.")
 
-            # Fetch admin and user
             try:
                 portal_user = PortalUser.objects.get(id=admin_identifier)
                 admin_record = Admin.objects.get(admin_id=admin_identifier)
@@ -43,12 +38,10 @@ class ServiceChargesManagementView(APIView):
 
             client_db = switch_to_database(admin_record.db_name)
 
-            # Build filtered queryset
             providers_qs = self._build_provider_queryset(
                 from_date, to_date, provider_id, svc_id, hsn_id, query_text
             )
 
-            # Pagination
             paginator = Paginator(providers_qs, page_sz)
             try:
                 current_page = paginator.page(page_num)
@@ -59,7 +52,6 @@ class ServiceChargesManagementView(APIView):
                     'data': {}
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            # Transform data with charges and hierarchy
             transformed_data = self._format_providers_with_charges(
                 current_page, admin_record, portal_user, client_db
             )
@@ -109,8 +101,6 @@ class ServiceChargesManagementView(APIView):
 
         for sp in page_items:
             charge_list = self._retrieve_applicable_charges(sp, admin_rec)
-
-            # Determine if this SP is provided to the admin
             ad_sp_entry = AdServiceProvider.objects.using(db_alias).filter(sys_id=sp.sys_id).first()
             is_provided_to_admin = ad_sp_entry.sa_provided if ad_sp_entry else True
 
@@ -142,7 +132,6 @@ class ServiceChargesManagementView(APIView):
                     }
                 child_mapping[sp.parent_id]['sub_service_provider'].append(provider_info)
 
-        # Append all sub-provider groups
         for child_group in child_mapping.values():
             results.append(child_group)
 
@@ -261,7 +250,6 @@ class ServiceChargesManagementView(APIView):
                     if not ad_sp:
                         continue
 
-                    # Sync charges
                     for slab in slabs:
                         if not Adcharges.objects.using(client_db).filter(
                             service_provider=ad_sp, charge_category='to_us',
@@ -278,7 +266,6 @@ class ServiceChargesManagementView(APIView):
                                 created_by=portal_usr
                             )
 
-                    # Toggle status
                     toggle_msg = self._toggle_provider_status(
                         ad_sp, not ad_sp.sa_provided,
                         sp.platform_fee, sp.platform_fee_type,
@@ -286,7 +273,6 @@ class ServiceChargesManagementView(APIView):
                     )
 
             else:
-                # Identifier-based flow
                 identifiers = SaCoreServiceIdentifier.objects.filter(sp__sp_id=sp_id)
                 for identifier in identifiers:
                     self._ensure_hsn_exists(identifier.sp.hsn_sac, portal_usr)
@@ -326,7 +312,6 @@ class ServiceChargesManagementView(APIView):
                         identifier.sp.credentials_json, client_db
                     )
 
-            # Update collective deactivation status
             admin_services = AdminService.objects.filter(service_provider_id=sp_id, admin__admin_id=admin_id)
             for svc in admin_services:
                 svc.is_deactive = not svc.is_deactive
@@ -363,7 +348,6 @@ class ServiceChargesManagementView(APIView):
             sp_obj = ServiceProvider.objects.get(sp_id=sp_id)
             admin_user = PortalUser.objects.using(admin_obj.db_name).get(id=1)
 
-            # Update AdminService charges
             admin_svcs = AdminService.objects.filter(admin=admin_obj, service_provider=sp_obj)
             if not admin_svcs.exists():
                 return self._bad_request("No admin service mapping found.")
@@ -389,7 +373,6 @@ class ServiceChargesManagementView(APIView):
                         admin_svc.rate = new_rate_val
                     admin_svc.save()
 
-            # Update Adcharges
             ad_sps = AdServiceProvider.objects.using(client_db).filter(sys_id=sp_obj.sys_id, is_self_config=False)
             if ad_sps.exists():
                 ad_charges = Adcharges.objects.using(client_db).filter(

@@ -1,6 +1,6 @@
 from ...views import*
 
-class InventoryManagementView(APIView):
+class ProductManagementView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -26,10 +26,9 @@ class InventoryManagementView(APIView):
                 data_copy = request.data.copy()
                 uploaded_paths = []
 
-                # Handle multiple image uploads
                 for field_name, file_obj in request.FILES.items():
                     if field_name.startswith('item_image'):
-                        if file_obj.size > 10 * 1024 * 1024:  # 10MB limit
+                        if file_obj.size > 10 * 1024 * 1024: 
                             raise ValidationError("Each image must be under 10MB.")
 
                         safe_filename = os.path.basename(file_obj.name)

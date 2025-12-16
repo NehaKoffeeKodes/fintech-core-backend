@@ -7,7 +7,6 @@ class GadgetCategoryView(APIView):
     permission_classes = [IsSuperAdmin | IsAdmin]
 
     def post(self, request):
-        """Handle POST requests - either list or create category"""
         try:
             if 'page_number' in request.data and 'page_size' in request.data:
                 return self.get_category_list(request)
@@ -25,7 +24,6 @@ class GadgetCategoryView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def create_new_category(self, request):
-        """Create a new device category"""
         try:
             name = request.data.get('category_name')
             description = request.data.get('description')
@@ -77,7 +75,6 @@ class GadgetCategoryView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_category_list(self, request):
-        """Fetch paginated list of categories"""
         try:
             page = int(request.data.get('page_number', 1))
             size = int(request.data.get('page_size', 10))
@@ -141,7 +138,6 @@ class GadgetCategoryView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request):
-        """Update existing category"""
         try:
             cat_id = request.data.get('category_id')
             name = request.data.get('category_name')
@@ -202,7 +198,6 @@ class GadgetCategoryView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):
-        """Soft delete a category"""
         try:
             cat_id = request.data.get('category_id')
 
@@ -415,7 +410,6 @@ class ProductView(APIView):
 
             with transaction.atomic():
                 if not any([cat_id, desc, price, stock, image]):
-                    # Just toggle active status
                     product.is_deactive = not product.is_deactive
                     action = 'activated' if not product.is_deactive else 'deactivated'
                 else:

@@ -7,7 +7,6 @@ class SuperAdminTransactionReportView(APIView):
 
     def post(self, request):
         try:
-            # Check if pagination params are present — only then process report
             if request.data.get('page_number') is not None or request.data.get('page_size') is not None:
                 return self.generate_paginated_report(request)
             else:
@@ -22,7 +21,6 @@ class SuperAdminTransactionReportView(APIView):
             )
 
     def retrieve_all_database_names(self):
-        """Fetch all non-template PostgreSQL databases"""
         try:
             with connection.cursor() as cur:
                 cur.execute("SELECT datname FROM pg_database WHERE datistemplate = false;")
@@ -32,7 +30,6 @@ class SuperAdminTransactionReportView(APIView):
             return []
 
     def resolve_service_and_provider_details(self, provider_id, database_alias):
-        """Resolve service name and provider name from AdServiceProvider → ServiceProvider"""
         try:
             if not provider_id:
                 return None, None
@@ -55,7 +52,6 @@ class SuperAdminTransactionReportView(APIView):
 
     def generate_paginated_report(self, request):
         try:
-            # Extract and validate input parameters
             page_num = int(request.data.get('page_number', 1))
             page_sz = int(request.data.get('page_size', 10))
             admin_identifier = request.data.get('admin_id', '').strip()
@@ -66,11 +62,10 @@ class SuperAdminTransactionReportView(APIView):
             from_date = request.data.get('start_date', '')
             to_date = request.data.get('end_date', '')
             search_term = request.data.get('search', '').strip().lower()
-            target_sp_id = int(request.data.get('sp_id', 0))  # New SP filter
+            target_sp_id = int(request.data.get('sp_id', 0))  
 
             report_entries = []
 
-            # Determine which databases to scan
             if admin_identifier:
                 try:
                     target_admin = Admin.objects.get(admin_id=admin_identifier)
@@ -84,7 +79,6 @@ class SuperAdminTransactionReportView(APIView):
                 all_dbs = self.retrieve_all_database_names()
                 database_list = all_dbs[2:] if len(all_dbs) > 2 else []
 
-            # Define service-wise transaction model mappings
             transaction_mappings = {
                 "2": {"model": FundTransferEntry, "table": "ad_dmt_transaction", "sp_field": "dmt_sp_id", "amt_field": "dmt_txn_amount", "status_field": "dmt_txn_status", "cust_name": "dmt_customer_name", "cust_mobile": "dmt_customer_contact_number", "ref_id": "dmt_refrence_id"},
                 "4": {"model": FundTransferEntry, "table": "ad_dmt_transaction", "sp_field": "dmt_sp_id", "amt_field": "dmt_txn_amount", "status_field": "dmt_txn_status", "cust_name": "dmt_customer_name", "cust_mobile": "dmt_customer_contact_number", "ref_id": "dmt_refrence_id"},
@@ -127,7 +121,6 @@ class SuperAdminTransactionReportView(APIView):
                         try:
                             service_table = str(global_trn.service_trn_table)
 
-                            # Determine correct mapping based on sp_id filter or table match
                             config = None
                             if target_sp_id > 0:
                                 config = transaction_mappings.get(str(target_sp_id))
@@ -184,7 +177,6 @@ class SuperAdminTransactionReportView(APIView):
                 finally:
                     connections[db_alias].close()
 
-            # Pagination
             total_count = len(report_entries)
             paginator = Paginator(report_entries, page_sz)
             try:

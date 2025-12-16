@@ -80,24 +80,19 @@ class TransactionRuleManagementView(APIView):
             size = int(request.data.get('page_size', 10))
             user_name = request.data.get('user_name')
             provider_name = request.data.get('provider_name')
-
-            # Base query
             rules = LimitConfig.objects.select_related('user_account', 'provider').order_by('-rule_id')
 
-            # Apply filters
             if user_name:
                 rules = rules.filter(user_account__username__icontains=user_name)
             if provider_name:
                 rules = rules.filter(provider__name__icontains=provider_name)
 
-            # Pagination
             paginator = Paginator(rules, size)
             try:
                 current_page = paginator.page(page)
             except:
                 current_page = paginator.page(paginator.num_pages)
 
-            # Serialize data
             serializer = LimitConfigSerializer(current_page, many=True)
 
             response_data = {

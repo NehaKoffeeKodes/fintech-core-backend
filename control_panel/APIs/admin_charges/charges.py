@@ -76,7 +76,6 @@ class FeeManagementAPIView(APIView):
                 base_qs = base_qs.filter(
                     Q(charges_type__icontains=search_term) |
                     Q(rate_type__icontains=search_term)
-                    # Add more Q objects if you have additional searchable fields
                 )
 
             paginator = Paginator(base_qs, page_size)

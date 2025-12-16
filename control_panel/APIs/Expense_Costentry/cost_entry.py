@@ -4,7 +4,6 @@ class CostManagementView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        """Handle create or list requests"""
         try:
             if 'page_number' in request.data:
                 return self.list_costs(request)
@@ -22,17 +21,15 @@ class CostManagementView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def add_new_cost(self, request):
-        """Create a new cost entry with file uploads"""
         try:
             with transaction.atomic():
                 data = request.data.copy()
                 uploaded_files = []
 
-                # Handle multiple file uploads (keys like expense_attachment[0], expense_attachment[1]...)
                 for key in data.keys():
                     if key.startswith('expense_attachment'):
                         file_obj = data[key]
-                        if file_obj.size > 10 * 1024 * 1024:  # 10MB limit
+                        if file_obj.size > 10 * 1024 * 1024: 
                             raise ValidationError("Each file must be under 10MB")
 
                         save_path = os.path.join('costs/documents', file_obj.name)
@@ -45,7 +42,6 @@ class CostManagementView(APIView):
 
                         uploaded_files.append(save_path)
 
-                # Prepare data for serializer
                 if uploaded_files:
                     data['documents'] = uploaded_files
 
@@ -53,7 +49,6 @@ class CostManagementView(APIView):
                 if serializer.is_valid(raise_exception=True):
                     cost_obj = serializer.save(created_by=request.user)
 
-                    # Log activity
                     AdminActivityLog.objects.create(
                         table_id=cost_obj.entry_id,
                         table_name='cost_entry',
@@ -86,7 +81,6 @@ class CostManagementView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def list_costs(self, request):
-        """Fetch paginated list of cost entries"""
         try:
             page = int(request.data.get('page_number', 1))
             size = int(request.data.get('page_size', 10))
@@ -147,7 +141,6 @@ class CostManagementView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request):
-        """Update existing cost entry"""
         entry_id = request.data.get('entry_id')
         if not entry_id:
             return Response({
@@ -162,7 +155,6 @@ class CostManagementView(APIView):
                 data = request.data.copy()
                 new_files = []
 
-                # Handle new file uploads
                 for key in data.keys():
                     if key.startswith('expense_attachment'):
                         file = data[key]
@@ -178,7 +170,6 @@ class CostManagementView(APIView):
                                 f.write(chunk)
                         new_files.append(save_path)
 
-                # Append new files to existing ones
                 if new_files:
                     current_docs = cost_obj.documents or []
                     data['documents'] = current_docs + new_files
@@ -187,7 +178,6 @@ class CostManagementView(APIView):
                 if serializer.is_valid(raise_exception=True):
                     serializer.save(updated_at=datetime.now(), updated_by=request.user)
 
-                    # Log update
                     AdminActivityLog.objects.create(
                         table_id=cost_obj.entry_id,
                         table_name='cost_entry',
@@ -220,7 +210,6 @@ class CostManagementView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):
-        """Soft delete a cost entry"""
         entry_id = request.data.get('entry_id')
         if not entry_id:
             return Response({

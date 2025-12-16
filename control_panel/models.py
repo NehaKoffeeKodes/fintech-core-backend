@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.validators import RegexValidator
 from web_portal.models import*
-from django.contrib.auth import get_user_model
+
 
 
 
@@ -260,8 +260,6 @@ class ServiceProvider(models.Model):
 
 
 
-User = get_user_model()
-
 class AdminService(models.Model):
     assignment_id = models.AutoField(primary_key=True)
     admin = models.ForeignKey(Admin,on_delete=models.CASCADE,related_name='assigned_services',null=True,blank=True)
@@ -271,7 +269,7 @@ class AdminService(models.Model):
     commission_rate = models.DecimalField(max_digits=8,decimal_places=4)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
-    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,related_name='service_assignments_created')
+    created_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,related_name='service_assignments_created')
     is_suspended = models.BooleanField(default=False)
     is_removed = models.BooleanField(default=False)
 
@@ -302,7 +300,7 @@ class AdminContract(models.Model):
     contract_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_contracts')
+    created_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True, related_name='created_contracts')
     admin = models.ForeignKey(Admin, on_delete=models.CASCADE, related_name='contracts', null=True)
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
@@ -323,19 +321,13 @@ class SaCoreServiceIdentifier(models.Model):
     provider = models.ForeignKey(ServiceProvider, on_delete=models.PROTECT, null=True, blank=True)
     settings = models.JSONField(null=True, blank=True)  
     last_updated = models.DateTimeField(auto_now=True)  
-    updated_by = models.ForeignKey(
-        AdminAccount,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        db_column='updated_by'
-    )
+    updated_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,blank=True,db_column='updated_by')
     disabled = models.BooleanField(default=False)
     removed = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'sa_provider_config'
-        app_label = 'web_portal'
+        app_label = 'control_panel'
         verbose_name = 'Provider Configuration'
         verbose_name_plural = 'Provider Configurations'
         ordering = ['-last_updated']
@@ -400,7 +392,6 @@ class AdditionalFee(models.Model):
 
 
 
-User = get_user_model()
 
 class ChargeRule(models.Model):
     TYPE_CHOICES = (('CREDIT', 'Credit'), ('DEBIT', 'Debit'))
@@ -417,7 +408,7 @@ class ChargeRule(models.Model):
     charge_beneficiary = models.CharField(max_length=20,choices=CATEGORY_CHOICES,default='OUR_SHARE')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL,null=True,related_name='modified_charge_rules')
+    updated_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL,null=True,related_name='modified_charge_rules')
     is_disabled = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
 

@@ -1,6 +1,5 @@
 from ...views import*
 
-load_dotenv()
 
 def generate_random_string(length=12):
     characters = string.ascii_letters + string.digits

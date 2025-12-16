@@ -1,7 +1,5 @@
 from ...views import*
 
-logger = logging.getLogger(__name__)
-
 
 class ManageDepositBanksAPIView(APIView):
     authentication_classes = [SecureJWTAuthentication]  
@@ -100,7 +98,6 @@ class ManageDepositBanksAPIView(APIView):
         except ValueError as ve:
             return Response({"error": True, "message": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Bank creation failed: {e}")
             return Response({"error": True, "message": "Server error."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     def get(self, request):
@@ -205,10 +202,8 @@ class ManageDepositBanksAPIView(APIView):
             })
 
         except ValueError as ve:
-            logger.error(f"List banks pagination error: {ve}")
             return Response({"error": True, "message": "Invalid page or size."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"List banks error: {e}", exc_info=True)
             return Response({"error": True, "message": "Server error."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):
@@ -295,5 +290,4 @@ class ManageDepositBanksAPIView(APIView):
         except DepositBankAccount.DoesNotExist:
             return Response({"error": True, "message": "Bank not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Bank update failed: {e}")
             return Response({"error": True, "message": "Update failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

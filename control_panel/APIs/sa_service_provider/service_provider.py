@@ -50,7 +50,6 @@ class ProviderManagementView(APIView):
                 'message': f'Server error: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # List vendors with pagination and filters
     def list_vendors(self, request):
         try:
             page = int(request.data.get('page_number', 1))
@@ -60,12 +59,10 @@ class ProviderManagementView(APIView):
             tax_id = request.data.get('tax_id')
             search = request.data.get('search')
 
-            # Basic pagination validation
             if page < 1 or size < 1:
                 return Response({'status': 'fail', 'message': 'Invalid pagination values'}, 
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            # Base query - only parent vendors
             query = ServiceProvider.objects.filter(parent__isnull=True, is_removed=False).order_by('-id')
 
             if vendor_id and vendor_id.isdigit():
@@ -93,13 +90,11 @@ class ProviderManagementView(APIView):
             for vendor in current_page:
                 tag_mode = vendor.uses_tag_based_fees
 
-                # Get related sub-entries
                 if tag_mode:
                     related = ServiceIdentifier.objects.filter(provider__id=vendor.id, is_removed=False)
                 else:
                     related = ServiceProvider.objects.filter(parent=vendor)
 
-                # Fetch fees
                 fees_qs = ChargeRule.objects.filter(vendor=vendor).order_by('min_amount')
                 fee_type = fees_qs.first().fee_type if fees_qs.exists() else None
                 serializer = ChargeRuleSerializer(fees_qs, many=True)
@@ -112,7 +107,6 @@ class ProviderManagementView(APIView):
                     item.pop('is_removed', None)
                     item['is_range_based'] = not (item['min_amount'] == "0.00" and item['max_amount'] == "0.00")
 
-                # Determine if fees exist on children/tags
                 if tag_mode:
                     active_tags = related.filter(is_inactive=False).count()
                     total_tags = related.count()
@@ -160,7 +154,6 @@ class ProviderManagementView(APIView):
                 'message': f'Error: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Toggle active/inactive status
     def toggle_vendor_status(self, request):
         try:
             vendor_id = request.data.get('vendor_id')
@@ -187,9 +180,7 @@ class ProviderManagementView(APIView):
                 msg = 'Tag activated' if not tag.is_inactive else 'Tag deactivated'
                 return Response({'status': 'success', 'message': msg}, status=status.HTTP_200_OK)
 
-            # Full vendor toggle
             if vendor.is_inactive:
-                # Check if fees exist before activation
                 if not ChargeRule.objects.filter(vendor=vendor).exists():
                     return Response({'status': 'fail', 'message': 'Setup fees before activating'}, 
                                     status=status.HTTP_400_BAD_REQUEST)
@@ -206,7 +197,6 @@ class ProviderManagementView(APIView):
             return Response({'status': 'error', 'message': str(e)}, 
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Update vendor fees (main logic for syncing charges)
     @transaction.atomic
     def update_vendor_fees(self, request):
         try:
@@ -222,7 +212,6 @@ class ProviderManagementView(APIView):
 
             vendor = ServiceProvider.objects.get(id=vendor_id)
 
-            # Update basic fields if not using tag
             if not tag_id:
                 if not tax_id:
                     return Response({'status': 'fail', 'message': 'tax_id required'}, 
@@ -233,7 +222,6 @@ class ProviderManagementView(APIView):
                 vendor.modified_by = request.user
                 vendor.save()
 
-            # Process incoming fee lists
             customer_fees_json = request.data.get('fees_to_customer', '[]')
             provider_fees_json = request.data.get('fees_to_provider', '[]')
 
@@ -308,7 +296,6 @@ class ProviderManagementView(APIView):
                     data['tag_id'] = tag_id
                 ChargeRule.objects.create(**data)
 
-        # Soft delete missing ones
         for key, fee in existing_map.items():
             if key not in incoming_keys:
                 fee.is_removed = True

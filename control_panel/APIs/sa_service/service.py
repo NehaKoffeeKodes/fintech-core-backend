@@ -100,12 +100,10 @@ class ServiceConfigManagementView(APIView):
                 service.details = new_desc
                 updated = True
 
-            # If no description provided, assume toggle active/inactive
             if new_desc is None:
                 service.inactive = not service.inactive
                 updated = True
 
-                # Sync with linked providers
                 ServiceProvider.objects.filter(service=service).update(is_deactive=service.inactive)
 
             if updated:

@@ -54,7 +54,6 @@ class UpdatePasswordView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def trigger_security_alert(self, request, user):
-        """Private method to send password change notification"""
         try:
             config = SmtpEmail.objects.filter(
                 template_key__iexact='admin_password_change'
@@ -82,7 +81,6 @@ class UpdatePasswordView(APIView):
             pass 
 
     def build_alert_email(self, request, user):
-        """Generate beautiful, clean security alert email"""
         ip = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', 'Unknown'))
         platform = request.META.get('HTTP_SEC_CH_UA_PLATFORM', 'Unknown').strip('"')
         browser = 'Unknown'

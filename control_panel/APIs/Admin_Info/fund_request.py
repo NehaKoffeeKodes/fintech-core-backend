@@ -6,7 +6,6 @@ class ManageFundRequestsView(APIView):
     permission_classes = [IsSuperAdmin | IsAdmin]
 
     def post(self, request):
-        """Create or List Fund Requests"""
         if 'bank_id' in request.data and 'amount' in request.data:
             return self.create_request(request)
         else:

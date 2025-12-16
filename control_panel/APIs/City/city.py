@@ -1,39 +1,29 @@
 from ...views import *
 
-# City Management API View
+
 class CityAPIView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin | IsAdmin | IsDistributor | IsRetailer]
 
     def post(self, request, *args, **kwargs):
-        """
-        Handles two operations via POST:
-        1. Bulk upload of cities via CSV file
-        2. Fetching paginated/filtered list of cities (when no file is provided)
-        """
         try:
-            # Case 1: CSV Bulk Upload
             if 'file' in request.FILES:
                 uploaded_file = request.FILES['file']
 
-                # Validate file extension
                 if not uploaded_file.name.lower().endswith('.csv'):
                     return Response(
                         {"error": "Only CSV files are allowed."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-                # Read and decode CSV
                 file_content = uploaded_file.read().decode('utf-8')
                 csv_reader = csv.DictReader(StringIO(file_content))
 
-                # Process each row
                 for row_index, row in enumerate(csv_reader, start=1):
                     city_serializer = CitySerializer(data=row)
                     if city_serializer.is_valid():
                         city_serializer.save()
                     else:
-                        # Return detailed error with row number for better debugging
                         error_msg = f"Validation error in row {row_index}: {city_serializer.errors}"
                         return Response(
                             {"error": error_msg},
@@ -45,7 +35,6 @@ class CityAPIView(APIView):
                     status=status.HTTP_201_CREATED
                 )
 
-            # Case 2: No file → Treat as list/fetch request
             else:
                 return self.retrieve_cities(request)
 
@@ -56,19 +45,13 @@ class CityAPIView(APIView):
             )
 
     def retrieve_cities(self, request):
-        """
-        Internal method to fetch and paginate city data with filters.
-        Supports filtering by state_id, state_name, and city_name (search).
-        """
         try:
-            # Extract request parameters
             page_num = request.data.get('page_number', 1)
             page_sz = request.data.get('page_size', 20)
             state_identifier = request.data.get('state_id')
             search_city = request.data.get('search')
             state_search_name = request.data.get('state_name')
 
-            # Custom pagination validation (similar logic, different implementation)
             try:
                 page_num = int(page_num)
                 page_sz = int(page_sz)
@@ -82,7 +65,6 @@ class CityAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Resolve state_id from state_name if provided
             if state_search_name:
                 try:
                     state_obj = Region.objects.get(state_name__iexact=state_search_name.strip())
@@ -93,16 +75,13 @@ class CityAPIView(APIView):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
-            # Base queryset
             city_queryset = Location.objects.all().order_by('city_name')
 
-            # Apply filters
             if state_identifier:
                 city_queryset = city_queryset.filter(state_id=state_identifier)
             if search_city:
                 city_queryset = city_queryset.filter(city_name__icontains=search_city.strip())
 
-            # Special case: page_size = "0" means return all records (no pagination)
             if str(page_sz) == "0":
                 serializer = CitySerializer(
                     city_queryset,
@@ -123,7 +102,6 @@ class CityAPIView(APIView):
                     status=status.HTTP_200_OK
                 )
 
-            # Normal pagination
             paginator = Paginator(city_queryset, page_sz)
             try:
                 current_page = paginator.page(page_num)
@@ -133,7 +111,6 @@ class CityAPIView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-            # Handle empty results
             if not current_page.object_list.exists():
                 empty_payload = {
                     'total_pages': 0,
@@ -146,7 +123,6 @@ class CityAPIView(APIView):
                     status=status.HTTP_200_OK
                 )
 
-            # Serialize paginated data
             serialized_data = CitySerializer(
                 current_page.object_list,
                 many=True,

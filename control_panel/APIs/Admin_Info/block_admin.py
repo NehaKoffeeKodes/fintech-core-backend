@@ -1,7 +1,5 @@
 from ...views import*
 
-logger = logging.getLogger(__name__)
-
 
 class AdminBlockView(APIView):
     authentication_classes = [SecureJWTAuthentication]
@@ -77,7 +75,6 @@ class AdminBlockView(APIView):
             }, status=status.HTTP_424_FAILED_DEPENDENCY)
 
         except Exception as err:
-            logger.error(f"Client access toggle failed for ID {admin_id}: {str(err)}", exc_info=True)
             return Response({
                 'success': False,
                 'message': f'Operation failed due to server error: {str(err)}'

@@ -24,7 +24,6 @@ class AdminDisputeRecordsView(APIView):
                 'message': f'Server error occurred: {str(exc)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # List all complaint records with filters and pagination
     def list_complaint_records(self, request):
         page_num = int(request.data.get('page_num', 1))
         page_size = int(request.data.get('page_size', 10))
@@ -424,7 +423,6 @@ class AdminDisputeRecordsView(APIView):
                 item['txn_amount'] = getattr(txn_record, map_entry['amount_field'], None)
                 item['txn_current_status'] = getattr(txn_record, map_entry['status_field'], None)
 
-            # You can replace this with your own pagination helper if needed
             add_serial_numbers(page_num, page_size, serialized_data, 'desc')
 
             return Response({
@@ -444,7 +442,7 @@ class AdminDisputeRecordsView(APIView):
                 'message': f'Error fetching records: {str(exc)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Show what will be reversed (preview impact)
+
     def show_reversal_impact(self, request):
         provider_id = str(request.data.get('provider_id'))
         txn_ref = request.data.get('txn_ref')
@@ -820,7 +818,6 @@ class AdminDisputeRecordsView(APIView):
                 'message': f'Error: {str(exc)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Execute actual reversal
     def execute_reversal(self, request):
         provider_id = str(request.data.get('provider_id'))
         txn_ref = request.data.get('txn_ref')
@@ -1199,15 +1196,12 @@ class AdminDisputeRecordsView(APIView):
                                 entry_datetime=now()
                             )
 
-                # Reverse GL direction
                 for gl in gl_entries:
                     gl.effective_type = 'DR' if gl.effective_type == 'CR' else 'CR'
                     gl.save(using=db_conn)
 
-                # Soft delete govt charges if any
                 GovernmentChargeLog.objects.using(db_conn).filter(sp__sp_id=provider_id, transaction_id=txn_ref).update(is_deleted=True)
-
-            # Update complaint status in both cases
+                
             complaint_obj = Servicedispute.objects.get(txn_ref=txn_ref, provider_id=provider_id)
             complaint_obj.complaint_status = new_status
             complaint_obj.admin_notes = notes

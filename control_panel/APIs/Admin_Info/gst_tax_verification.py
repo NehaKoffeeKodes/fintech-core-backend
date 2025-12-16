@@ -1,7 +1,4 @@
 from ...views import *
-import os
-from dotenv import load_dotenv
-load_dotenv()
 
 X_CLIENT_ID = os.getenv("X_CLIENT_ID")
 X_CLIENT_SECRET = os.getenv("X_CLIENT_SECRET")

@@ -167,8 +167,7 @@ class CategoryManagementView(APIView):
                         request_data=request.data,
                         response_data=serializer.data
                     )
-
-                    # Custom success message based on what was updated
+                    
                     if 'inactive' in request.data:
                         action = "deactivated" if updated_category.inactive else "activated"
                         message = f'Category {action} successfully.'

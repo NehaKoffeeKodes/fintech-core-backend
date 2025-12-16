@@ -2,10 +2,6 @@ from ...views import *
 
 
 class AdminWalletAdjustmentView(APIView):
-    """
-    Super Admin ke liye manual credit/debit aur transaction reversal
-    Tere naye sundar models ke saath perfect sync!
-    """
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin]
 
@@ -208,7 +204,6 @@ class AdminWalletAdjustmentView(APIView):
             setattr(transaction, status_field, 'REVERSED')
             transaction.save(using=admin.db_name)
 
-            # Reverse wallet entries
             gl_entries = GlTrn.objects.using(admin.db_name).filter(
                 service_table=transaction._meta.db_table,
                 service_record_id=transaction.pk
@@ -240,7 +235,6 @@ class AdminWalletAdjustmentView(APIView):
                         created_at=now()
                     )
 
-            # Mark govt levy as deleted
             GovernmentChargeLog.objects.using(admin.db_name).filter(
                 provider_id=sp_id, transaction_ref=txn_ref
             ).update(is_deleted=True)
