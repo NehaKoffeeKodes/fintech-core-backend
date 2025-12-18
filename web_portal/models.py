@@ -50,7 +50,8 @@ class AdminActivityLog(models.Model):
         verbose_name = "Admin Activity Log"
 
     def __str__(self):
-        return f"{self.user} - {self.action} - {self.timestamp.strftime('%d %b %Y %I:%M %p')}"
+        user_display = self.user.username if self.user else "System/Unknown"
+        return f"{user_display} - {self.action} - {self.timestamp.strftime('%d %b %Y %I:%M %p')}"
 
 
 class Superadminlogindetails(models.Model):

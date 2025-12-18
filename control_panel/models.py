@@ -74,7 +74,7 @@ class SMSTemplate(models.Model):
 
 class Region(models.Model): 
     region_id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=120, unique=True, db_index=True)
+    region_name = models.CharField(max_length=120, unique=True, db_index=True)
     short_code = models.CharField(max_length=10, blank=True, null=True)
     status = models.BooleanField(default=True)
     added_on = models.DateTimeField(auto_now_add=True)
@@ -88,7 +88,7 @@ class Region(models.Model):
         verbose_name_plural = 'Regions'
 
     def __str__(self):
-        return self.name
+        return self.region_name
 
     def clean(self):
         if self.short_code:
@@ -143,73 +143,6 @@ class Servicedispute(models.Model):
   
 
 
-class Admin(models.Model):
-    GST_COMPOSITION = 'COMPOSITION'
-    GST_REGULAR = 'REGULAR'
-    GST_UNREGISTERED = 'UNREGISTERED'
-    GST_SEZ = 'SEZ'
-    GST_EXPORT = 'EXPORT'
-    GST_ECOM = 'ECOMMERCE'
-
-    GST_REGIME_CHOICES = [
-        (GST_COMPOSITION, 'Composition'),
-        (GST_REGULAR, 'Regular'),
-        (GST_UNREGISTERED, 'Unregistered'),
-        (GST_SEZ, 'SEZ'),
-        (GST_EXPORT, 'Exports'),
-        (GST_ECOM, 'E-Commerce'),
-    ]
-
-    STATUS_PENDING = 'PENDING'
-    STATUS_APPROVED = 'APPROVED'
-    STATUS_REJECTED = 'REJECTED'
-    STATUS_CHOICES = [
-        (STATUS_PENDING, 'Pending'),
-        (STATUS_APPROVED, 'Approved'),
-        (STATUS_REJECTED, 'Rejected'),
-    ]
-
-    admin_id = models.AutoField(primary_key=True)
-    entity_name = models.CharField(max_length=150, unique=True)
-    mobile = models.CharField(max_length=10, unique=True)
-    email = models.EmailField(unique=True)
-    avatar = models.ImageField(upload_to='entities/avatar/', null=True, blank=True)   
-    pan = models.CharField(max_length=10, unique=True, null=True, blank=True)
-    aadhaar = models.CharField(max_length=12, unique=True, null=True, blank=True)    
-    is_pan_verified = models.BooleanField(default=False)
-    is_gst_verified = models.BooleanField(default=False)
-    company_title = models.CharField(max_length=255, null=True, blank=True)
-    gst_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
-    gst_regime = models.CharField(max_length=20, choices=GST_REGIME_CHOICES, default=GST_COMPOSITION)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
-    rejection_reason = models.TextField(null=True, blank=True)
-    documents_uploaded = models.JSONField(default=list, blank=True)
-    registered_state = models.ForeignKey(Region, on_delete=models.SET_NULL, null=True)
-    registered_city = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True)
-    pin_code = models.CharField(max_length=6, null=True, blank=True)
-    enabled_services = models.JSONField(default=list, blank=True)
-    agreement_pdf = models.FileField(upload_to='agreements/', null=True, blank=True)
-    db_name = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    is_soft_deleted = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,related_name='entities_created_by')
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def save(self, *args, **kwargs):
-        if self.email:
-            self.email = self.email.lower().strip()
-        if self.pan:
-            self.pan = self.pan.upper()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.entity_name} ({self.get_status_display()})"
-
-    class Meta:
-        db_table = 'admin'
-        
-  
 
 class SaCoreService(models.Model):
     service_key = models.AutoField(primary_key=True)
@@ -257,8 +190,128 @@ class ServiceProvider(models.Model):
 
     def __str__(self):
         return f"{self.display_label} ({self.admin_code})"
+    
+    
+    
 
+class Charges(models.Model):
+    CREDIT = 'CR'
+    DEBIT = 'DR'
+    CHARGE_TYPE_CHOICES = [
+        (CREDIT, 'Credit'),
+        (DEBIT, 'Debit'),
+    ]
 
+    FLAT = 'is_flat'
+    PERCENT = 'is_percent'
+    RATE_TYPE_CHOICES = [
+        (FLAT, 'Is Flat'),
+        (PERCENT, 'Is Percent'),
+    ]
+
+    TO_US = 'to_us'
+    TO_PROVIDE = 'to_provide'
+    CATEGORY_CHOICES = [
+        (TO_US, 'To Us'),
+        (TO_PROVIDE, 'To Provide'),
+    ]
+
+    charges_id = models.AutoField(primary_key=True)
+    service_provider = models.ForeignKey(ServiceProvider,on_delete=models.CASCADE,related_name='charges')
+    charges_type = models.CharField(max_length=2,choices=CHARGE_TYPE_CHOICES)
+    rate_type = models.CharField(max_length=20,choices=RATE_TYPE_CHOICES)
+    minimum = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    maximum = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    rate = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
+    identifier_id = models.IntegerField(null=True,blank=True,)
+    charge_category = models.CharField(max_length=20,choices=CATEGORY_CHOICES,default=TO_US)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+    updated_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,blank=True,db_column='updated_by',related_name='updated_charges')
+    is_deactive = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'sa_charges'
+        verbose_name = 'Charge Slab'
+        verbose_name_plural = 'Charge Slabs'
+        ordering = ['minimum', 'charges_id']
+
+    def __str__(self):
+        provider = self.service_provider.label if hasattr(self.service_provider, 'label') else self.service_provider.sp_name
+        return f"Charge {self.charges_id} - {provider} ({self.get_charges_type_display()})"
+    
+    
+    
+    
+class Admin(models.Model):
+    GST_COMPOSITION = 'COMPOSITION'
+    GST_REGULAR = 'REGULAR'
+    GST_UNREGISTERED = 'UNREGISTERED'
+    GST_SEZ = 'SEZ'
+    GST_EXPORT = 'EXPORT'
+    GST_ECOM = 'ECOMMERCE'
+
+    GST_REGIME_CHOICES = [
+        (GST_COMPOSITION, 'Composition'),
+        (GST_REGULAR, 'Regular'),
+        (GST_UNREGISTERED, 'Unregistered'),
+        (GST_SEZ, 'SEZ'),
+        (GST_EXPORT, 'Exports'),
+        (GST_ECOM, 'E-Commerce'),
+    ]
+
+    STATUS_PENDING = 'PENDING'
+    STATUS_APPROVED = 'APPROVED'
+    STATUS_REJECTED = 'REJECTED'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    admin_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=150, unique=True)
+    mobile_number = models.CharField(max_length=10, unique=True)
+    email = models.EmailField(unique=True)
+    avatar = models.ImageField(upload_to='entities/avatar/', null=True, blank=True)   
+    pan = models.CharField(max_length=10, unique=True, null=True, blank=True)
+    aadhaar = models.CharField(max_length=12, unique=True, null=True, blank=True)    
+    is_pan_verified = models.BooleanField(default=False)
+    is_gst_verified = models.BooleanField(default=False)
+    company_title = models.CharField(max_length=255, null=True, blank=True)
+    gst_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    gst_regime = models.CharField(max_length=20, choices=GST_REGIME_CHOICES, default=GST_COMPOSITION)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    rejection_reason = models.TextField(null=True, blank=True)
+    documents_uploaded = models.JSONField(default=list, blank=True)
+    registered_state = models.ForeignKey(Region, on_delete=models.SET_NULL, null=True)
+    registered_city = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True)
+    pin_code = models.CharField(max_length=6, null=True, blank=True)
+    enabled_services = models.JSONField(default=list, blank=True)
+    charges = models.ManyToManyField(Charges,blank=True,related_name='admins')
+    agreement_pdf = models.FileField(upload_to='agreements/', null=True, blank=True)
+    db_name = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    is_soft_deleted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,related_name='entities_created_by')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.lower().strip()
+        if self.pan:
+            self.pan = self.pan.upper()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"
+
+    class Meta:
+        db_table = 'admin'
+        
+  
 
 class AdminService(models.Model):
     assignment_id = models.AutoField(primary_key=True)
@@ -470,54 +523,6 @@ class SaAdditionalCharges(models.Model):
     def __str__(self):
         return f"{self.title or 'No Title'} ({self.amount or 0})"
 
-
-
-class Charges(models.Model):
-    CREDIT = 'CR'
-    DEBIT = 'DR'
-    CHARGE_TYPE_CHOICES = [
-        (CREDIT, 'Credit'),
-        (DEBIT, 'Debit'),
-    ]
-
-    FLAT = 'is_flat'
-    PERCENT = 'is_percent'
-    RATE_TYPE_CHOICES = [
-        (FLAT, 'Is Flat'),
-        (PERCENT, 'Is Percent'),
-    ]
-
-    TO_US = 'to_us'
-    TO_PROVIDE = 'to_provide'
-    CATEGORY_CHOICES = [
-        (TO_US, 'To Us'),
-        (TO_PROVIDE, 'To Provide'),
-    ]
-
-    charges_id = models.AutoField(primary_key=True)
-    service_provider = models.ForeignKey(ServiceProvider,on_delete=models.CASCADE,related_name='charges')
-    charges_type = models.CharField(max_length=2,choices=CHARGE_TYPE_CHOICES)
-    rate_type = models.CharField(max_length=20,choices=RATE_TYPE_CHOICES)
-    minimum = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
-    maximum = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
-    rate = models.DecimalField(max_digits=10,decimal_places=2,null=True,blank=True)
-    identifier_id = models.IntegerField(null=True,blank=True,)
-    charge_category = models.CharField(max_length=20,choices=CATEGORY_CHOICES,default=TO_US)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(null=True, blank=True)
-    updated_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL,null=True,blank=True,db_column='updated_by',related_name='updated_charges')
-    is_deactive = models.BooleanField(default=False)
-    is_deleted = models.BooleanField(default=False)
-
-    class Meta:
-        db_table = 'sa_charges'
-        verbose_name = 'Charge Slab'
-        verbose_name_plural = 'Charge Slabs'
-        ordering = ['minimum', 'charges_id']
-
-    def __str__(self):
-        provider = self.service_provider.label if hasattr(self.service_provider, 'label') else self.service_provider.sp_name
-        return f"Charge {self.charges_id} - {provider} ({self.get_charges_type_display()})"
 
 
 

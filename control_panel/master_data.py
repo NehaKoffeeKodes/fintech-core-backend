@@ -2,6 +2,42 @@ from admin_hub.models import*
 from control_panel.models import *
 
 def master_data(db_name):
+    # ====== 1. COPY ALL REGIONS (with same PK) ======
+    default_regions = Region.objects.using('default').all()
+    for reg in default_regions:
+        Region.objects.using(db_name).update_or_create(
+            region_id=reg.region_id,  # Preserve exact primary key
+            defaults={
+                'region_name': reg.region_name,
+                'short_code': reg.short_code or '',
+                'status': reg.status,
+                'added_by': reg.added_by,
+                'modified_by': reg.modified_by,
+            }
+        )
+
+    # ====== 2. COPY ALL LOCATIONS (with same PK and correct region FK) ======
+    default_locations = Location.objects.using('default').all()
+    for loc in default_locations:
+        # Get the Region that already exists in the tenant DB (by same PK)
+        try:
+            tenant_region = Region.objects.using(db_name).get(region_id=loc.region_id)
+        except Region.DoesNotExist:
+            print(f"Warning: Region ID {loc.region_id} not found for location {loc.city_name}. Skipping.")
+            continue
+
+        Location.objects.using(db_name).update_or_create(
+            locality_id=loc.locality_id,  # Preserve exact primary key
+            defaults={
+                'region': tenant_region,           # Link to tenant's Region instance
+                'city_name': loc.city_name,
+                'active': loc.active,
+                'created_by': loc.created_by,
+                'updated_by': loc.updated_by,
+            }
+        )
+
+    # ====== YOUR EXISTING CODE (keep the rest) ======
     for old_cat in SaBillerGroup.objects.filter(is_deleted=False):
         BillerGroup.objects.using(db_name).get_or_create(
             name=old_cat.ss_name,
@@ -36,11 +72,10 @@ def master_data(db_name):
         )
 
     default_charges = ['instant_transfer_fee', 'bank_transfer_fee']
-
     for charge_name in default_charges:
         SaOperatorCharge.objects.get_or_create(
             name=charge_name,
             defaults={'is_active': True}
         )
 
-    print(f"Seed data successfully added in database: {db_name}")
+    print(f"Master data (Regions + Locations + Others) successfully synced to database: {db_name}")

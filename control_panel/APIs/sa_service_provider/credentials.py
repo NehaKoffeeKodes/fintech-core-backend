@@ -1,7 +1,7 @@
 from ...views import*
 
 
-class UpdateProviderSettingsView(APIView):
+class CredentialSettingsView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin]
 

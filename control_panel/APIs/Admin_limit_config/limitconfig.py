@@ -43,25 +43,29 @@ class LimitConfigRuleView(APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             if LimitConfig.objects.filter(
-                user_account_id=user_id, 
+                admin_id=user_id, 
                 provider_id=provider_id
             ).exists():
+
                 return Response({
                     'status': 'fail',
                     'message': 'A rule already exists for this user and provider'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            with transaction.atomic():
-                LimitConfig.objects.create(
-                    user_account_id=user_id,
-                    provider_id=provider_id,
-                    max_per_transaction=Decimal(single_max),
-                    max_daily_total=Decimal(daily_max),
-                    max_monthly_total=Decimal(monthly_max),
-                    max_daily_transactions=daily_count,
-                    max_monthly_transactions=monthly_count,
-                    is_enabled=True
-                )
+            admin_obj = Admin.objects.get(admin_id=user_id)
+            provider_obj = ServiceProvider.objects.get(admin_id=provider_id)
+
+            LimitConfig.objects.create(
+                admin_id=user_id,          
+                provider_id=provider_id,  
+                max_per_transaction=Decimal(single_max),
+                max_daily_total=Decimal(daily_max),
+                max_monthly_total=Decimal(monthly_max),
+                max_daily_transactions=daily_count,
+                max_monthly_transactions=monthly_count,
+                is_enabled=True
+            )
+
 
             return Response({
                 'status': 'success',
@@ -78,19 +82,21 @@ class LimitConfigRuleView(APIView):
         try:
             page = int(request.data.get('page_number', 1))
             size = int(request.data.get('page_size', 10))
-            user_name = request.data.get('user_name')
-            provider_name = request.data.get('provider_name')
-            rules = LimitConfig.objects.select_related('user_account', 'provider').order_by('-rule_id')
+            
+            user_id = request.data.get('user_id')
+            provider_id = request.data.get('provider_id')
+            rules = LimitConfig.objects.all().order_by('-rule_id')
+            
+            if user_id:
+                rules = rules.filter(admin_id=user_id)
 
-            if user_name:
-                rules = rules.filter(user_account__username__icontains=user_name)
-            if provider_name:
-                rules = rules.filter(provider__name__icontains=provider_name)
+            if provider_id:
+                rules = rules.filter(provider_id=provider_id)
 
             paginator = Paginator(rules, size)
             try:
                 current_page = paginator.page(page)
-            except:
+            except EmptyPage:
                 current_page = paginator.page(paginator.num_pages)
 
             serializer = LimitConfigSerializer(current_page, many=True)

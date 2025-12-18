@@ -66,7 +66,7 @@ class GadgetPurchaseAPIView(APIView):
                     grand_total=total_amount,
                     order_ref=ref_code,
                     buyer_name=current_user.pu_name,
-                    buyer_phone=current_user.pu_contact_no,
+                    buyer_phone=current_user.pu_mobile_number,
                     initiated_by=request.user.id
                 )
 
@@ -102,7 +102,7 @@ class GadgetPurchaseAPIView(APIView):
                 db = get_database_from_domain()
                 admin = Admin.objects.get(db_name=db)
                 switch_to_database(admin.db_name)
-                qs = GadgetPurchase.objects.filter(buyer_phone=admin.contact_no).order_by('-initiated_on')
+                qs = GadgetPurchase.objects.filter(buyer_phone=admin.mobile_number).order_by('-initiated_on')
             else:
                 qs = GadgetPurchase.objects.all().order_by('-initiated_on')
 
@@ -162,10 +162,10 @@ class GadgetPurchaseAPIView(APIView):
                 return Response({'status': 'fail', 'message': 'Purchase ID and status required.'}, status=status.HTTP_400_BAD_REQUEST)
 
             purchase = GadgetPurchase.objects.get(purchase_id=purchase_id)
-            admin = Admin.objects.get(contact_no=purchase.buyer_phone)
+            admin = Admin.objects.get(mobile_number=purchase.buyer_phone)
             switch_to_database(admin.db_name)
 
-            portal_user = PortalUser.objects.using(admin.db_name).get(pu_contact_no=admin.contact_no)
+            portal_user = PortalUser.objects.using(admin.db_name).get(pu_mobile_number=admin.mobile_number)
             wallet = PortalUserBalance.objects.using(admin.db_name).get(pu=portal_user)
 
             if request.user.pu_role == 'ADMIN' and new_status == 'CANCELLED' and purchase.status == 'PENDING':

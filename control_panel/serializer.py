@@ -5,182 +5,165 @@ from admin_hub.models import *
 
 class AdminSerializer(serializers.ModelSerializer):
     account_status = serializers.SerializerMethodField()
-    tax_category_label = serializers.CharField(source='get_tax_category_display', read_only=True)
-    assigned_services = serializers.SerializerMethodField()
-    document_bundle = serializers.SerializerMethodField(source='document_bundle', read_only=True)
-    contract_value = serializers.SerializerMethodField()
-    tax_on_contract = serializers.SerializerMethodField()
-    net_payable = serializers.SerializerMethodField()
-    contract_approval_status = serializers.SerializerMethodField()
-    registered_state = serializers.CharField(write_only=True, required=True, allow_blank=False)
-    registered_city = serializers.CharField(write_only=True, required=True, allow_blank=False)
-    registered_state_detail = serializers.CharField(source='registered_state.name', read_only=True)
-    registered_city_detail = serializers.CharField(source='registered_city.title', read_only=True)
+    gst_regime_label = serializers.CharField(source='get_gst_regime_display', read_only=True)
+    associated_services = serializers.SerializerMethodField()
+    uploaded_documents = serializers.SerializerMethodField()
+    agreement_base_amount = serializers.SerializerMethodField()
+    agreement_gst_amount = serializers.SerializerMethodField()
+    agreement_total_amount = serializers.SerializerMethodField()
+    agreement_payment_status = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Admin
         fields = '__all__'
-        read_only_fields = ('joined_on', 'last_modified', 'created_by_user', 'modified_by_user')
+        read_only_fields = ('created_at', 'updated_at', 'created_by', 'admin_id', 'is_active', 'is_soft_deleted')
 
     def get_account_status(self, obj):
-        return "Enabled" if obj.is_active else "Disabled"
+        return "Active" if obj.is_active and not obj.is_soft_deleted else "Inactive"
 
-    def get_contract_value(self, obj):
-        try:
-            contract = AdminContract.objects.get(admin=obj)
-            return AdminContractSerializer(contract).data.get('base_amount')
-        except AdminContract.DoesNotExist:
-            return None
-
-    def get_tax_on_contract(self, obj):
-        try:
-            contract = AdminContract.objects.get(admin=obj)
-            base = float(AdminContractSerializer(contract).data.get('base_amount', 0))
-            gst = round(base * 0.18, 2)
-            return str(gst)
-        except AdminContract.DoesNotExist:
-            return None
-
-    def get_net_payable(self, obj):
-        try:
-            contract = AdminContract.objects.get(admin=obj)
-            base = float(contract.base_amount or 0)
-            total = base + (base * 0.18)
-            return str(round(total, 2))
-        except AdminContract.DoesNotExist:
-            return None
-
-    def get_contract_approval_status(self, obj):
-        try:
-            contract = AdminContract.objects.get(admin=obj)
-            return AdminContractSerializer(contract).data.get('approval_status')
-        except AdminContract.DoesNotExist:
-            return None
-
-    def get_assigned_services(self, obj):
-        services = obj.services_offered.filter(is_active=True, is_deleted=False)
-        return AdminServiceDetailSerializer(services, many=True, context=self.context).data
-
-    def get_document_bundle(self, instance):
+    def get_avatar_url(self, obj):
         request = self.context.get('request')
-        if not request or not instance.document_bundle:
+        if not obj.avatar or not request:
+            return None
+        try:
+            scheme = "https" if request.is_secure() else "http"
+            full_url = f"{scheme}://{request.get_host()}{settings.MEDIA_URL}{obj.avatar.name.replace('\\', '/')}"
+            return full_url
+        except Exception:
+            return None
+
+    def get_uploaded_documents(self, obj):
+        request = self.context.get('request')
+        if not obj.documents_uploaded or not request:
             return {}
+        try:
+            scheme = "https" if request.is_secure() else "http"
+            base_url = f"{scheme}://{request.get_host()}{settings.MEDIA_URL}"
+            processed_docs = {}
+            for key, file_path in obj.documents_uploaded.items():
+                clean_path = file_path.replace('\\', '/')
+                processed_docs[key] = f"{base_url}{clean_path}"
+            return processed_docs
+        except Exception:
+            return obj.documents_uploaded
 
-        base_url = f"https://{request.get_host()}" if request.is_secure() else f"http://{request.get_host()}"
-        media_root = settings.MEDIA_URL
+    def get_associated_services(self, obj):
+        try:
+            services = obj.enabled_services_admin.filter(is_deleted=False)  
+            return AdminServiceDetailSerializer(services, many=True, context=self.context).data
+        except Exception:
+            return []
 
-        updated_docs = {}
-        for key, file_path in instance.document_bundle.items():
-            clean_path = str(file_path).replace('\\', '/')
-            updated_docs[key] = f"{base_url}{media_root}{clean_path}"
-        return updated_docs
+    def get_agreement_base_amount(self, obj):
+        try:
+            agreement = AdminContract.objects.get(admin_id=obj.admin_id)
+            return agreement.aa_amount  
+        except AdminContract.DoesNotExist:
+            return None
+        except Exception:
+            return None
 
-    def validate_business_name(self, value):
-        if 'test' in value.lower() or 'demo' in value.lower():
-            raise serializers.ValidationError("Business name cannot contain restricted words like 'test' or 'demo'.")
+    def get_agreement_gst_amount(self, obj):
+        try:
+            agreement = AdminContract.objects.get(admin_id=obj.admin_id)
+            base = float(agreement.aa_amount or 0)
+            gst = base * 0.18
+            return f"{gst:.2f}"
+        except AdminContract.DoesNotExist:
+            return None
+        except (ValueError, TypeError, Exception):
+            return None
+
+    def get_agreement_total_amount(self, obj):
+        try:
+            agreement = AdminContract.objects.get(admin_id=obj.admin_id)
+            base = float(agreement.aa_amount or 0)
+            total = base + (base * 0.18)
+            return f"{total:.2f}"
+        except AdminContract.DoesNotExist:
+            return None
+        except (ValueError, TypeError, Exception):
+            return None
+
+    def get_agreement_payment_status(self, obj):
+        try:
+            agreement = AdminContract.objects.get(admin_id=obj.admin_id)
+            return agreement.aa_status  
+        except AdminContract.DoesNotExist:
+            return None
+        except Exception:
+            return None
+
+  
+    def validate_name(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Name cannot be empty.")
+        if "test" in value.lower():  
+            raise serializers.ValidationError("Name cannot contain restricted words.")
         return value.strip()
 
-    def validate(self, attrs):
-        instance = self.instance
-        is_create = not bool(instance)
+    def validate_mobile(self, value):
+        if not value.isdigit() or len(value) != 10:
+            raise serializers.ValidationError("Mobile number must be exactly 10 digits.")
+        return value
 
-        mandatory = ['entity_name', 'mobile', 'email', 'company_title', 'pin_code']
+    def validate_pan(self, value):
+        if value and len(value) != 10:
+            raise serializers.ValidationError("PAN must be exactly 10 characters.")
+        return value.upper() if value else value
+
+    def validate_aadhaar(self, value):
+        if value and len(value) != 12:
+            raise serializers.ValidationError("Aadhaar must be exactly 12 digits.")
+        return value
+
+    def validate_gst_number(self, value):
+        if value and len(value) != 15:
+            raise serializers.ValidationError("GST number must be exactly 15 characters.")
+        return value.upper() if value else value
+
+    
+    def validate(self, data):
+        is_create = not self.instance
+
+        mandatory_fields = [
+            'name', 'mobile_number', 'email', 'company_title',
+            'registered_state', 'registered_city', 'pin_code'
+        ]
+
         errors = {}
 
-        if is_create:
-            for field in mandatory:
-                if not attrs.get(field):
-                    nice_name = field.replace('_', ' ').title()
-                    errors[field] = f"{nice_name} is mandatory."
+       
+        for field in mandatory_fields:
+            value = data.get(field)
+            if is_create and (value is None or (isinstance(value, str) and not value.strip())):
+                errors[field] = f"{field.replace('_', ' ').title()} is required."
 
-        if is_create:
-            if not attrs.get('registered_state'):
-                errors['registered_state'] = "Registered State is mandatory."
-            if not attrs.get('registered_city'):
-                errors['registered_city'] = "Registered City is mandatory."
+       
+        avatar_file = data.get('avatar')
+        if avatar_file and hasattr(avatar_file, 'size') and avatar_file.size > 10 * 1024 * 1024:
+            errors['avatar'] = "Avatar image size should not exceed 10 MB."
 
-        if attrs.get('pan') and len(attrs['pan']) != 10:
-            errors['pan'] = "PAN must be exactly 10 characters."
-
-        if attrs.get('aadhaar') and len(attrs['aadhaar']) != 12:
-            errors['aadhaar'] = "Aadhaar must be exactly 12 digits."
-
-        for field in ['avatar', 'agreement_pdf']:
-            uploaded_file = attrs.get(field)
-            if uploaded_file and uploaded_file.size > 15 * 1024 * 1024:
-                errors[field] = f"{field.replace('_', ' ').title()} size should not exceed 15MB."
+      
+        agreement_file = data.get('agreement_pdf')
+        if agreement_file and hasattr(agreement_file, 'size') and agreement_file.size > 20 * 1024 * 1024:
+            errors['agreement_pdf'] = "Agreement PDF should not exceed 20 MB."
 
         if errors:
             raise serializers.ValidationError(errors)
 
-        return attrs
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        remove_keys = self.context.get('remove_fields', [])
-        for key in remove_keys:
-            data.pop(key, None)
         return data
-    
-    def create(self, validated_data):
-        # State aur City ke naam pop karo
-        state_name = validated_data.pop('registered_state', None)
-        city_name = validated_data.pop('registered_city', None)
 
-        # Admin create karo
-        admin_instance = super().create(validated_data)
+    # Optional: exclude fields based on context
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        exclude = self.context.get('exclude_fields', [])
+        for field in exclude:
+            ret.pop(field, None)
+        return ret
 
-        # State object fetch karke assign karo
-        if state_name:
-            try:
-                state_obj = Region.objects.get(name__iexact=state_name.strip())
-                admin_instance.registered_state = state_obj
-            except Region.DoesNotExist:
-                raise serializers.ValidationError({
-                    "registered_state": f"State '{state_name}' not found in database."
-                })
-
-        # City object fetch karke assign karo
-        if city_name:
-            try:
-                city_obj = Location.objects.get(title__iexact=city_name.strip())
-                admin_instance.registered_city = city_obj
-            except Location.DoesNotExist:
-                raise serializers.ValidationError({
-                    "registered_city": f"City '{city_name}' not found in database."
-                })
-
-        admin_instance.save()
-        return admin_instance
-
-    def update(self, instance, validated_data):
-        # Same logic for update
-        state_name = validated_data.pop('registered_state', None)
-        city_name = validated_data.pop('registered_city', None)
-
-        instance = super().update(instance, validated_data)
-
-        if state_name is not None:
-            try:
-                state_obj = Region.objects.get(name__iexact=state_name.strip())
-                instance.registered_state = state_obj
-            except Region.DoesNotExist:
-                raise serializers.ValidationError({
-                    "registered_state": f"State '{state_name}' not found."
-                })
-
-        if city_name is not None:
-            try:
-                city_obj = Location.objects.get(title__iexact=city_name.strip())
-                instance.registered_city = city_obj
-            except Location.DoesNotExist:
-                raise serializers.ValidationError({
-                    "registered_city": f"City '{city_name}' not found."
-                })
-
-        instance.save()
-        return instance
-    
+  
     
 class AdminContractSerializer(serializers.ModelSerializer):
     class Meta:
@@ -219,6 +202,8 @@ class AdminContractSerializer(serializers.ModelSerializer):
             instance.gst_component = float(instance.base_amount) * 0.18
             instance.save(update_fields=['gst_component'])
         return instance
+    
+    
 
 class ServiceProviderSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
@@ -637,16 +622,22 @@ class ChargesRuleSerializer(serializers.ModelSerializer):
 
 class SaAdditionalChargesSerializer(serializers.ModelSerializer):
     tax_info = serializers.SerializerMethodField()
-    status_label = serializers.CharField(source='get_is_active_display', read_only=True)
+    status_label = serializers.SerializerMethodField()
 
     class Meta:
         model = AdditionalFee
         exclude = ['is_removed', 'added_on', 'added_by']
 
     def get_tax_info(self, obj):
-        if obj.gst_code:
-            return f"{obj.gst_code.code} ({obj.gst_code.rate}%)"
+        if obj.tax_code:
+            gst = obj.tax_code
+            total_tax = (gst.cgst or 0) + (gst.sgst or 0)
+            return f"{gst.gst_code} ({total_tax}%)"
         return "No Tax"
+
+    def get_status_label(self, obj):
+        return "Active" if obj.is_active else "Inactive"
+
 
 
 

@@ -65,8 +65,8 @@ class AdminSessionByPassView(APIView):
 
 
 class VerifySessionBypass(APIView):
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [SecureJWTAuthentication]
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         token = request.data.get('access_token')

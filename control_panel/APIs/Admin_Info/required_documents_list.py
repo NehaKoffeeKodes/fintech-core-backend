@@ -20,22 +20,27 @@ class ManageDocumentTemplatesView(APIView):
                     AdminActivityLog.objects.create(
                         user=request.user,
                         action="CREATE",
-                        entity="DocumentTemplate",
-                        admin_id=template.template_id,
-                        description=f"Created document: {template.display_name}",
-                        ip_address=request.META.get('REMOTE_ADDR')
+                        description=f"Created document template: {template.display_name}",
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT'),
+                        request_data={
+                            "entity": "DocumentTemplate",
+                            "template_id": template.template_id
+                        }
                     )
+
 
                     return Response({
                         "success": True,
                         "message": "Document template added successfully"
                     }, status=status.HTTP_201_CREATED)
 
-                errors = [str(err) for err in serializer.errors.values()]
-                return Response({
-                    "success": False,
-                    "message": " | ".join(errors)
-                }, status=status.HTTP_400_BAD_REQUEST)
+                if not serializer.is_valid():
+                    return Response({
+                        "success": False,
+                        "message": "Validation failed",
+                        "errors": serializer.errors  # ← This is the key!
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             return Response({
@@ -64,10 +69,15 @@ class ManageDocumentTemplatesView(APIView):
                     AdminActivityLog.objects.create(
                         user=request.user,
                         action="UPDATE",
-                        entity="DocumentTemplate",
-                        admin_id=updated_template.template_id,
-                        description=f"Updated: {updated_template.display_name}"
+                        description=f"Updated document template: {updated_template.display_name}",
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT'),
+                        request_data={
+                            "entity": "DocumentTemplate",
+                            "template_id": updated_template.template_id
+                        }
                     )
+
 
                     return Response({
                         "success": True,
@@ -101,10 +111,15 @@ class ManageDocumentTemplatesView(APIView):
                 AdminActivityLog.objects.create(
                     user=request.user,
                     action="DELETE",
-                    entity="DocumentTemplate",
-                    admin_id=template.template_id,
-                    description=f"Deleted template: {template.display_name}"
+                    description=f"Deleted document template: {template.display_name}",
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT'),
+                    request_data={
+                        "entity": "DocumentTemplate",
+                        "template_id": template.template_id
+                    }
                 )
+
 
                 return Response({
                     "success": True,

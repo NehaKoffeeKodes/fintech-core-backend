@@ -57,7 +57,7 @@ class StateAPIView(APIView):
     def get_region_list(self, request):
         try:
             search_term = request.data.get('state_name', '').strip()
-            regions_qs = Region.objects.all().order_by('name')
+            regions_qs = Region.objects.all().order_by('region_name')
 
             if search_term:
                 regions_qs = regions_qs.filter(name__icontains=search_term) 

@@ -5,11 +5,18 @@ from control_panel.APIs.Admin_Info.admin_static import *
 from control_panel.APIs.Admin_Info.bank_verification import *
 from control_panel.APIs.Admin_Info.change_pass_word import *
 from control_panel.APIs.Admin_Info.create_admin import *
+from control_panel.APIs.Admin_Info.dmt_fix_charge import DmtFixChargeView
 from control_panel.APIs.Admin_Info.dmt_priority import *
 from control_panel.APIs.Admin_Info.manual_credit_debit import *
 from control_panel.APIs.Admin_Transaction.admin_dispute import *
+from control_panel.APIs.Admin_charges.charges import ChargeManagementAPIView
+from control_panel.APIs.Admin_limit_config.limitconfig import LimitConfigRuleView
 from control_panel.APIs.Admin_service_charges.admin_service_charge import *
 from control_panel.APIs.City.city import*
+from control_panel.APIs.Device_booking.manage_product import GadgetCategoryView, ItemSerialView, ProductView
+from control_panel.APIs.Expense_Costentry.cost_entry import CostManagementView
+from control_panel.APIs.FeesCategory.charge_category import ChargeCategoryView
+from control_panel.APIs.Global_bank.globalbank import GlobalBankInstitutionView
 from control_panel.APIs.HSNSAC.hsn_sac import*
 from control_panel.APIs.Admin_Info.admin_login_log_details import *
 from control_panel.APIs.Admin_Info.admin_session_pass import*
@@ -21,13 +28,14 @@ from control_panel.APIs.Admin_Info.fund_request import*
 from control_panel.APIs.Admin_Info.gst_tax_verification import*
 from control_panel.APIs.Admin_Info.s_admin_other_charges import *
 from control_panel.APIs.Admin_Info.required_documents_list import *
+from control_panel.APIs.Sa_service.service_balance import GatewayBalanceView
+from control_panel.APIs.Sa_service_provider.credentials import CredentialSettingsView
+from control_panel.APIs.Sa_service_provider.service_provider import ProviderManagementView
 from control_panel.APIs.State.state_create import StateAPIView
 from control_panel.APIs.Device_booking.device import *
 from control_panel.APIs.Product_Item.product import *
 from control_panel.APIs.Product_category.productitem_category import *
 from control_panel.APIs.Sa_service.service import *
-from control_panel.APIs.admin_charges.charges import *
-from control_panel.APIs.admin_limit_config.limitconfig import *
 from control_panel.send_otp import *
 
 
@@ -83,6 +91,9 @@ urlpatterns = [
     #DMT_PRIORITY
     path('dmt-priority/',DmtPriorityView.as_view()),
     
+    #dmt_fix_charge
+    path('dmt-fix-charge/',DmtFixChargeView.as_view()),
+    
     #SUPER_ADMIN_OTHER_CHARGES
     path('sa-manage-charges/',SaManageChargesView.as_view()),
     
@@ -119,12 +130,35 @@ urlpatterns = [
     #device
     path('gadget-purchase/',GadgetPurchaseAPIView.as_view()),
     
+    #manage_product
+    path('gadget-category/',GadgetCategoryView.as_view()),
+    path('product/',ProductView.as_view()),
+    path('item-serial/',ItemSerialView.as_view()),
+    
+    #expense_costentry
+    path('cost-management/',CostManagementView.as_view()),
+    
+    #feescategory
+    path('charge-category/',ChargeCategoryView.as_view()),
+    
+    #global_bank
+    path('global-bank-institution/',GlobalBankInstitutionView.as_view()),
+    
+    #service_balance
+    path('gateway-balance/',GatewayBalanceView.as_view()),
+    
+    #CREDENTIALS
+    path('credential-settings/',CredentialSettingsView.as_view()),
+    
     #views
     path('create-order',CreateOrderManager.as_view()),
     path('auth/',AuthView.as_view()),
     path('beneficiary-manage/',BeneficiaryManager.as_view()),
     path('fund-transfer/',FundTransferView.as_view()),
     path('dmt-ppi/',DMTPPIView.as_view()),
+    
+    #service_provider
+    path('provider-management/',ProviderManagementView.as_view()),
     
     
     

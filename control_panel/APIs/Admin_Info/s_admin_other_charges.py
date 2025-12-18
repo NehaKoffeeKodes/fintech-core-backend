@@ -79,7 +79,7 @@ class SaManageChargesView(APIView):
 
             
             if tax_id:
-                tax_obj = GSTCode.objects.get(id=tax_id)
+                tax_obj = GSTCode.objects.get(gst_id=tax_id)
                 fee.tax_code = tax_obj
 
             if category is not None:
