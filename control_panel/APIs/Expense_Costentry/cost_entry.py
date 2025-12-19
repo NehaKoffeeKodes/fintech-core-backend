@@ -50,14 +50,12 @@ class CostManagementView(APIView):
                     cost_obj = serializer.save(created_by=request.user)
 
                     AdminActivityLog.objects.create(
-                        table_id=cost_obj.entry_id,
-                        table_name='cost_entry',
-                        ua_action='create',
-                        ua_description='Added new cost entry',
-                        created_by=request.user,
-                        request_data=request.data,
-                        response_data=serializer.data
+                        user=request.user,
+                        action='create cost entry',
+                        description=f"Added new cost entry with ID {cost_obj.entry_id}. Response: {serializer.data}",
+                        request_data=request.data
                     )
+
 
                     return Response({
                         'status': 'success',
@@ -179,14 +177,15 @@ class CostManagementView(APIView):
                     serializer.save(updated_at=datetime.now(), updated_by=request.user)
 
                     AdminActivityLog.objects.create(
-                        table_id=cost_obj.entry_id,
-                        table_name='cost_entry',
-                        ua_action='update',
-                        ua_description=f'Updated cost entry {cost_obj.entry_id}',
-                        created_by=request.user,
+                        user=request.user,
+                        action='UPDATE',
+                        description=f'Updated cost entry {cost_obj.entry_id}',
                         request_data=request.data,
-                        response_data=serializer.data
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT')
                     )
+
+
 
                     return Response({
                         'status': 'success',
@@ -224,13 +223,14 @@ class CostManagementView(APIView):
                 cost_obj.save()
 
                 AdminActivityLog.objects.create(
-                    table_id=cost_obj.entry_id,
-                    table_name='cost_entry',
-                    ua_action='delete',
-                    ua_description=f'Deleted cost entry {cost_obj.entry_id}',
-                    created_by=request.user,
-                    request_data=request.data
+                    user=request.user,
+                    action='DELETE',
+                    description=f'Deleted cost entry {cost_obj.entry_id}',
+                    request_data=request.data,
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT')
                 )
+
 
                 return Response({
                     'status': 'success',

@@ -10,7 +10,7 @@ class GadgetCategoryView(APIView):
         try:
             if 'page_number' in request.data and 'page_size' in request.data:
                 return self.get_category_list(request)
-            elif 'category_name' in request.data:
+            elif 'category_name' in request.data or 'name' in request.data:
                 return self.create_new_category(request)
             else:
                 return Response({
@@ -25,14 +25,12 @@ class GadgetCategoryView(APIView):
 
     def create_new_category(self, request):
         try:
-            name = request.data.get('category_name')
-            description = request.data.get('description')
-            parent_id = request.data.get('parent_category_id')
+            name = request.data.get('category_name') or request.data.get('name')
+            details = request.data.get('description') or request.data.get('details')
+            parent_id = request.data.get('parent_category_id') or request.data.get('parent')
 
-            save_api_log(
-                request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Create Device Category", client_override="fintech_backend_db"
-            )
+            save_api_log(request, "OwnAPI", request.data, {"status": "processing"}, None,
+                         service_type="Create Device Category", client_override="fintech_backend_db")
 
             if not name:
                 return Response({
@@ -40,7 +38,7 @@ class GadgetCategoryView(APIView):
                     'message': 'Category name is required'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            if GadgetCategory.objects.filter(category_name__iexact=name, is_deleted=False).exists():
+            if GadgetCategory.objects.filter(name__iexact=name, removed=False).exists():
                 return Response({
                     'status': 'fail',
                     'message': 'A category with this name already exists'
@@ -48,16 +46,14 @@ class GadgetCategoryView(APIView):
 
             with transaction.atomic():
                 GadgetCategory.objects.create(
-                    category_name=name,
-                    description=description,
-                    parent_category_id=parent_id,
+                    name=name,
+                    details=details,
+                    parent=parent_id,
                     created_by=request.user.id
                 )
 
-                save_api_log(
-                    request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Create Device Category", client_override="fintech_backend_db"
-                )
+                save_api_log(request, "OwnAPI", request.data, {"status": "success"}, None,
+                             service_type="Create Device Category", client_override="fintech_backend_db")
 
             return Response({
                 'status': 'success',
@@ -65,10 +61,8 @@ class GadgetCategoryView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            save_api_log(
-                request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Create Device Category", client_override="fintech_backend_db"
-            )
+            save_api_log(request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
+                         service_type="Create Device Category", client_override="fintech_backend_db")
             return Response({
                 'status': 'error',
                 'message': f'Internal server error: {str(e)}'
@@ -79,20 +73,20 @@ class GadgetCategoryView(APIView):
             page = int(request.data.get('page_number', 1))
             size = int(request.data.get('page_size', 10))
             search = request.data.get('search', '')
-            parent_id = request.data.get('parent_category_id')
+            parent_id = request.data.get('parent_category_id') or request.data.get('parent')
             only_sub = request.data.get('only_subcategories', False)
 
-            queryset = GadgetCategory.objects.filter(is_deleted=False).order_by('-category_id')
+            queryset = GadgetCategory.objects.filter(removed=False).order_by('-cat_id')
 
             if parent_id:
-                queryset = queryset.filter(parent_category_id=parent_id)
+                queryset = queryset.filter(parent=parent_id)
             elif only_sub:
-                queryset = queryset.exclude(parent_category_id__isnull=True)
+                queryset = queryset.exclude(parent__isnull=True)
 
             if search:
                 queryset = queryset.filter(
-                    Q(category_name__icontains=search) |
-                    Q(description__icontains=search)
+                    Q(name__icontains=search) |
+                    Q(details__icontains=search)
                 )
 
             paginator = Paginator(queryset, size)
@@ -107,17 +101,17 @@ class GadgetCategoryView(APIView):
             results = []
             for cat in page_obj:
                 parent_name = None
-                if cat.parent_category_id:
-                    parent = GadgetCategory.objects.filter(category_id=cat.parent_category_id).first()
-                    parent_name = parent.category_name if parent else None
+                if cat.parent:
+                    parent = GadgetCategory.objects.filter(cat_id=cat.parent).first()
+                    parent_name = parent.name if parent else None
 
                 results.append({
-                    'category_id': cat.category_id,
-                    'category_name': cat.category_name,
-                    'parent_category_id': cat.parent_category_id,
+                    'category_id': cat.cat_id,
+                    'category_name': cat.name,
+                    'parent_category_id': cat.parent,
                     'parent_category_name': parent_name,
-                    'description': cat.description,
-                    'created_at': cat.created_at.strftime("%d %B %Y %I:%M %p")
+                    'description': cat.details,
+                    'created_at': cat.created_on.strftime("%d %B %Y %I:%M %p")
                 })
 
             return Response({
@@ -137,9 +131,10 @@ class GadgetCategoryView(APIView):
                 'message': f'Internal server error: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
     def put(self, request):
         try:
-            cat_id = request.data.get('category_id')
+            cat_id = request.data.get('category_id')  
             name = request.data.get('category_name')
             desc = request.data.get('description')
             parent = request.data.get('parent_category_id')
@@ -155,21 +150,20 @@ class GadgetCategoryView(APIView):
                     'message': 'Category ID and name are required'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            category = GadgetCategory.objects.get(category_id=cat_id)
-
-            if GadgetCategory.objects.filter(category_name__iexact=name).exclude(category_id=cat_id).exists():
+            category = GadgetCategory.objects.get(cat_id=cat_id)
+            if GadgetCategory.objects.filter(name__iexact=name).exclude(cat_id=cat_id).exists():
                 return Response({
                     'status': 'fail',
                     'message': 'Category name already taken'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
-                category.category_name = name
+                category.name = name
                 if desc is not None:
-                    category.description = desc
+                    category.details = desc
                 if parent is not None:
-                    category.parent_category_id = parent
-                category.updated_at = timezone.now()
+                    category.parent = parent
+                category.updated_on = timezone.now()
                 category.save()
 
                 save_api_log(
@@ -197,6 +191,7 @@ class GadgetCategoryView(APIView):
                 'message': f'Internal server error: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
     def delete(self, request):
         try:
             cat_id = request.data.get('category_id')
@@ -212,12 +207,12 @@ class GadgetCategoryView(APIView):
                     'message': 'Category ID is required'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            category = GadgetCategory.objects.get(category_id=cat_id)
+            category = GadgetCategory.objects.get(cat_id=cat_id)
 
             with transaction.atomic():
-                category.is_deactive = True
-                category.is_deleted = True
-                category.updated_at = timezone.now()
+                category.inactive = True
+                category.removed = True
+                category.updated_on = timezone.now()
                 category.save()
 
                 save_api_log(
@@ -256,7 +251,7 @@ class ProductView(APIView):
         try:
             if 'page_number' in request.data and 'page_size' in request.data:
                 return self.get_product_list(request)
-            elif all(k in request.data for k in ['category_id', 'price', 'stock_qty', 'model_number']):
+            elif all(k in request.data for k in ['category_id', 'price', 'stock_qty', 'model_number', 'purchase_date']):
                 return self.create_new_product(request)
             else:
                 return Response({
@@ -275,6 +270,7 @@ class ProductView(APIView):
             price = request.data.get('price')
             stock = request.data.get('stock_qty')
             model = request.data.get('model_number')
+            purchase_date = request.data.get('purchase_date')
             desc = request.data.get('description', '')
             image = request.FILES.get('product_image')
 
@@ -283,26 +279,34 @@ class ProductView(APIView):
                 service_type="Create Product", client_override="fintech_backend_db"
             )
 
-            required_fields = ['category_id', 'price', 'stock_qty', 'model_number']
-            missing = enforce_required_fields(request.data, required_fields)
-            if missing:
-                return missing
+            if not all([category_id, price, stock, model, purchase_date]):
+                return Response({
+                    'status': 'fail',
+                    'message': 'Missing required fields'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-            category = GadgetCategory.objects.get(category_id=category_id)
+            try:
+                category = ProductItemCategory.objects.get(cat_id=category_id)
+            except ProductItemCategory.DoesNotExist:
+                return Response({
+                    'status': 'fail',
+                    'message': 'Invalid category'
+                }, status=status.HTTP_404_NOT_FOUND)
 
             image_path = store_uploaded_document(image, 'products') if image else None
             image_data = {'product_image': image_path} if image_path else None
 
             with transaction.atomic():
-                Product.objects.create(
+                ProductItem.objects.create(
                     category=category,
-                    product_name=category.category_name,
-                    stock_qty=stock,
-                    description=desc,
-                    model_number=model,
-                    price=price,
-                    product_image=image_data,
-                    created_by=request.user.id
+                    manufacturer=model.split()[0] if ' ' in model else model,
+                    item_model=model,
+                    stock_count=stock,
+                    unit_price=price,
+                    purchase_date=purchase_date,
+                    details=desc,
+                    images=image_data,
+                    added_by=request.user,
                 )
 
                 save_api_log(
@@ -315,11 +319,6 @@ class ProductView(APIView):
                 'message': 'Product created successfully'
             }, status=status.HTTP_201_CREATED)
 
-        except GadgetCategory.DoesNotExist:
-            return Response({
-                'status': 'fail',
-                'message': 'Invalid category'
-            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
@@ -337,22 +336,16 @@ class ProductView(APIView):
             search = request.data.get('search', '')
             cat_id = request.data.get('category_id')
 
-            products = Product.objects.select_related('category').filter(is_deactive=False).order_by('-product_id')
+            products = ProductItem.objects.select_related('category').filter(inactive=False, removed=False).order_by('-item_id')
 
             if search:
                 products = products.filter(
-                    Q(product_name__icontains=search) |
-                    Q(description__icontains=search) |
-                    Q(category__category_name__icontains=search)
+                    Q(item_model__icontains=search) |
+                    Q(details__icontains=search) |
+                    Q(category__name__icontains=search)
                 )
             if cat_id:
-                products = products.filter(category__category_id=cat_id)
-
-            if not products.exists():
-                return Response({
-                    'status': 'fail',
-                    'message': 'No products found'
-                }, status=status.HTTP_404_NOT_FOUND)
+                products = products.filter(category__cat_id=cat_id)
 
             paginator = Paginator(products, size)
             try:
@@ -363,11 +356,21 @@ class ProductView(APIView):
                     'message': 'Page not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            serializer = GadgetItemSerializer(page_obj, many=True, context={'request': request})
-            data = serializer.data
-
-            for item in data:
-                item['category_name'] = GadgetCategory.objects.get(category_id=item['category']).category_name
+            results = []
+            for prod in page_obj:
+                results.append({
+                    'item_id': prod.item_id,
+                    'category_id': prod.category.cat_id,
+                    'category_name': prod.category.name,
+                    'manufacturer': prod.manufacturer,
+                    'item_model': prod.item_model,
+                    'stock_count': prod.stock_count,
+                    'unit_price': str(prod.unit_price),
+                    'purchase_date': prod.purchase_date.strftime("%Y-%m-%d"),
+                    'details': prod.details,
+                    'images': prod.images,
+                    'added_on': prod.added_on.strftime("%d %B %Y %I:%M %p"),
+                })
 
             return Response({
                 'status': 'success',
@@ -376,7 +379,7 @@ class ProductView(APIView):
                     'total_items': paginator.count,
                     'total_pages': paginator.num_pages,
                     'current_page': page,
-                    'results': data
+                    'results': results
                 }
             }, status=status.HTTP_200_OK)
 
@@ -388,45 +391,50 @@ class ProductView(APIView):
 
     def put(self, request):
         try:
-            prod_id = request.data.get('product_id')
+            item_id = request.data.get('product_id')
             cat_id = request.data.get('category_id')
             desc = request.data.get('description')
             price = request.data.get('price')
             stock = request.data.get('stock_qty')
             image = request.FILES.get('product_image')
+            purchase_date = request.data.get('purchase_date')
 
             save_api_log(
                 request, "OwnAPI", request.data, {"status": "processing"}, None,
                 service_type="Update Product", client_override="fintech_backend_db"
             )
 
-            if not prod_id:
+            if not item_id:
                 return Response({
                     'status': 'fail',
                     'message': 'Product ID required'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            product = Product.objects.get(product_id=prod_id)
+            product = ProductItem.objects.get(item_id=item_id)
 
             with transaction.atomic():
-                if not any([cat_id, desc, price, stock, image]):
-                    product.is_deactive = not product.is_deactive
-                    action = 'activated' if not product.is_deactive else 'deactivated'
-                else:
-                    if cat_id:
-                        product.category = GadgetCategory.objects.get(category_id=cat_id)
-                    if desc is not None:
-                        product.description = desc
-                    if price is not None:
-                        product.price = price
-                    if stock is not None:
-                        product.stock_qty = stock
-                    if image:
-                        path = store_uploaded_document(image, 'products')
-                        product.product_image = {'product_image': path}
-                    action = 'updated'
+                if cat_id:
+                    try:
+                        product.category = ProductItemCategory.objects.get(cat_id=cat_id)
+                    except ProductItemCategory.DoesNotExist:
+                        return Response({
+                            'status': 'fail',
+                            'message': 'Invalid category'
+                        }, status=status.HTTP_404_NOT_FOUND)
 
-                product.updated_at = timezone.now()
+                if desc is not None:
+                    product.details = desc
+                if price is not None:
+                    product.unit_price = price
+                if stock is not None:
+                    product.stock_count = stock
+                if purchase_date:
+                    product.purchase_date = purchase_date
+                if image:
+                    path = store_uploaded_document(image, 'products')
+                    product.images = {'product_image': path}
+
+                product.modified_on = timezone.now()
                 product.save()
 
             save_api_log(
@@ -436,10 +444,10 @@ class ProductView(APIView):
 
             return Response({
                 'status': 'success',
-                'message': f'Product {action} successfully'
+                'message': 'Product updated successfully'
             }, status=status.HTTP_200_OK)
 
-        except Product.DoesNotExist:
+        except ProductItem.DoesNotExist:
             return Response({
                 'status': 'fail',
                 'message': 'Product not found'
@@ -456,18 +464,18 @@ class ProductView(APIView):
 
     def delete(self, request):
         try:
-            prod_id = request.data.get('product_id')
-            if not prod_id:
+            item_id = request.data.get('product_id')
+            if not item_id:
                 return Response({
                     'status': 'fail',
                     'message': 'Product ID required'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            product = Product.objects.get(product_id=prod_id)
+            product = ProductItem.objects.get(item_id=item_id)
             with transaction.atomic():
-                product.is_deleted = True
-                product.is_deactive = True
-                product.updated_at = timezone.now()
+                product.inactive = True
+                product.removed = True
+                product.modified_on = timezone.now()
                 product.save()
 
             return Response({
@@ -475,7 +483,7 @@ class ProductView(APIView):
                 'message': 'Product deleted successfully'
             }, status=status.HTTP_200_OK)
 
-        except Product.DoesNotExist:
+        except ProductItem.DoesNotExist:
             return Response({
                 'status': 'fail',
                 'message': 'Product not found'
@@ -487,11 +495,14 @@ class ProductView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+from django.shortcuts import get_object_or_404
+
 
 class ItemSerialView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin | IsAdmin]
 
+    # =================== POST ===================
     def post(self, request):
         try:
             if 'page_number' in request.data and 'page_size' in request.data:
@@ -501,29 +512,21 @@ class ItemSerialView(APIView):
             elif 'export_template' in request.data:
                 return self.export_template(request)
             else:
-                return Response({
-                    'status': 'error',
-                    'message': 'Invalid action'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'error', 'message': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': f'Internal server error: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'status': 'error', 'message': f'Internal server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    # =================== EXPORT TEMPLATE ===================
     def export_template(self, request):
         try:
             product_id = request.data.get('product_id')
             if not product_id:
-                return Response({
-                    'status': 'fail',
-                    'message': 'Product ID required'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'fail', 'message': 'Product ID required'}, status=status.HTTP_400_BAD_REQUEST)
 
-            product = Product.objects.get(product_id=product_id)
-            qty = product.stock_qty or 0
-            name = product.product_name
-            model = product.model_number
+            product = get_object_or_404(ProductItem, item_id=product_id)
+            qty = product.stock_count or 0
+            name = product.manufacturer
+            model = product.item_model
 
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             filename = f"{product_id}_serial_template_{timestamp}.csv"
@@ -538,97 +541,58 @@ class ItemSerialView(APIView):
                     writer.writerow([i, name, model, ''])
 
             file_url = request.build_absolute_uri(settings.MEDIA_URL + f"exports/{filename}")
-            return Response({
-                'status': 'success',
-                'file_url': file_url
-            }, status=status.HTTP_200_OK)
+            return Response({'status': 'success', 'file_url': file_url}, status=status.HTTP_200_OK)
 
-        except Product.DoesNotExist:
-            return Response({
-                'status': 'fail',
-                'message': 'Product not found'
-            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def import_serials(self, request):
         try:
             product_id = request.data.get('product_id')
             file = request.FILES.get('serial_file')
 
-            save_api_log(
-                request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Import Product Serials", client_override="fintech_backend_db"
-            )
+            save_api_log(request, "OwnAPI", request.data, {"status": "processing"}, None,
+                         service_type="Import Product Serials", client_override="fintech_backend_db")
 
             if not product_id or not file:
-                return Response({
-                    'status': 'fail',
-                    'message': 'Product ID and file required'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'fail', 'message': 'Product ID and file required'}, status=status.HTTP_400_BAD_REQUEST)
 
             wrapper = TextIOWrapper(file.file, encoding='utf-8')
             reader = csv.DictReader(wrapper)
             serials = [row['Serial Number'].strip() for row in reader if row.get('Serial Number', '').strip()]
 
             if not serials:
-                return Response({
-                    'status': 'fail',
-                    'message': 'No serial numbers found in file'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'fail', 'message': 'No serial numbers found in file'}, status=status.HTTP_400_BAD_REQUEST)
 
-            product = Product.objects.get(product_id=product_id)
-            existing_count = ItemSerial.objects.filter(product=product, is_deactive=False, is_deleted=False).count()
-            available = product.stock_qty - existing_count
+            product = get_object_or_404(ProductItem, item_id=product_id)
+            existing_count = ItemSerial.objects.filter(item=product, deactivated=False, deleted=False).count()
+            available = product.stock_count - existing_count
             unique_serials = list(set(serials))
 
             if len(unique_serials) > available:
-                return Response({
-                    'status': 'fail',
-                    'message': f'Only {available} serials can be added'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'fail', 'message': f'Only {available} serials can be added'}, status=status.HTTP_400_BAD_REQUEST)
 
-            duplicates = ItemSerial.objects.filter(
-                serial_number__in=unique_serials, is_deleted=False
-            ).values_list('serial_number', flat=True)
-
+            duplicates = ItemSerial.objects.filter(serial_code__in=unique_serials, deleted=False).values_list('serial_code', flat=True)
             if set(unique_serials) & set(duplicates):
-                return Response({
-                    'status': 'fail',
-                    'message': 'Some serial numbers already exist'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'fail', 'message': 'Some serial numbers already exist'}, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
                 ItemSerial.objects.bulk_create([
                     ItemSerial(
-                        product=product,
-                        serial_number=s,
+                        item=product, 
+                        serial_code=s,
                         created_by=request.user.id
                     ) for s in unique_serials
                 ])
+                save_api_log(request, "OwnAPI", request.data, {"status": "success"}, None,
+                             service_type="Import Product Serials", client_override="fintech_backend_db")
 
-                save_api_log(
-                    request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Import Product Serials", client_override="fintech_backend_db"
-                )
-
-            return Response({
-                'status': 'success',
-                'message': f'{len(unique_serials)} serial numbers imported'
-            }, status=status.HTTP_201_CREATED)
+            return Response({'status': 'success', 'message': f'{len(unique_serials)} serial numbers imported'}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            save_api_log(
-                request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Import Product Serials", client_override="fintech_backend_db"
-            )
-            return Response({
-                'status': 'error',
-                'message': f'Internal server error: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            save_api_log(request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
+                         service_type="Import Product Serials", client_override="fintech_backend_db")
+            return Response({'status': 'error', 'message': f'Internal server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_serial_list(self, request):
         try:
@@ -638,12 +602,11 @@ class ItemSerialView(APIView):
             search = request.data.get('search')
             active_only = request.data.get('only_active', False)
 
-            qs = ItemSerial.objects.filter(is_deactive=False) if active_only else ItemSerial.objects.all()
-
+            qs = ItemSerial.objects.filter(deactivated=False) if active_only else ItemSerial.objects.all()
             if product_id:
-                qs = qs.filter(product__product_id=product_id)
+                qs = qs.filter(item__item_id=product_id)
             if search:
-                qs = qs.filter(serial_number__icontains=search)
+                qs = qs.filter(serial_code__icontains=search)
 
             paginator = Paginator(qs, size)
             page_obj = paginator.page(page)
@@ -652,34 +615,22 @@ class ItemSerialView(APIView):
             for serial in page_obj:
                 results.append({
                     'serial_id': serial.serial_id,
-                    'serial_number': serial.serial_number,
-                    'product_name': serial.product.product_name if serial.product else None,
-                    'product_id': serial.product.product_id if serial.product else None,
-                    'category_id': serial.product.category.category_id if serial.product and serial.product.category else None,
-                    'created_at': serial.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                    'serial_number': serial.serial_code,
+                    'product_name': serial.item.item_model if serial.item else None,
+                    'product_id': serial.item.item_id if serial.item else None,
+                    'category_id': serial.item.category.cat_id if serial.item and serial.item.category else None,
+                    'created_at': serial.created_on.strftime("%Y-%m-%d %H:%M:%S")
                 })
 
-            return Response({
-                'status': 'success',
-                'message': 'Serial numbers fetched',
-                'data': {
-                    'total_items': paginator.count,
-                    'total_pages': paginator.num_pages,
-                    'current_page': page,
-                    'results': results
-                }
-            }, status=status.HTTP_200_OK)
+            return Response({'status': 'success', 'message': 'Serial numbers fetched',
+                             'data': {'total_items': paginator.count, 'total_pages': paginator.num_pages,
+                                      'current_page': page, 'results': results}}, status=status.HTTP_200_OK)
 
         except EmptyPage:
-            return Response({
-                'status': 'fail',
-                'message': 'Page not found'
-            }, status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'fail', 'message': 'Page not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': f'Internal server error: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'status': 'error', 'message': f'Internal server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     def put(self, request):
         try:
@@ -687,85 +638,47 @@ class ItemSerialView(APIView):
             new_serial = request.data.get('serial_number')
             new_product_id = request.data.get('product_id')
 
-            save_api_log(
-                request, "OwnAPI", request.data, {"status": "processing"}, None,
-                service_type="Update Serial Number", client_override="fintech_backend_db"
-            )
+            save_api_log(request, "OwnAPI", request.data, {"status": "processing"}, None,
+                         service_type="Update Serial Number", client_override="fintech_backend_db")
 
             if not serial_id:
-                return Response({
-                    'status': 'fail',
-                    'message': 'Serial ID required'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'fail', 'message': 'Serial ID required'}, status=status.HTTP_400_BAD_REQUEST)
 
-            serial = ItemSerial.objects.get(serial_id=serial_id)
-
+            serial = get_object_or_404(ItemSerial, serial_id=serial_id)
             with transaction.atomic():
                 if new_serial:
-                    if ItemSerial.objects.exclude(serial_id=serial_id).filter(serial_number=new_serial).exists():
-                        return Response({
-                            'status': 'fail',
-                            'message': 'Serial number already exists'
-                        }, status=status.HTTP_400_BAD_REQUEST)
-                    serial.serial_number = new_serial
+                    if ItemSerial.objects.exclude(serial_id=serial_id).filter(serial_code=new_serial).exists():
+                        return Response({'status': 'fail', 'message': 'Serial number already exists'}, status=status.HTTP_400_BAD_REQUEST)
+                    serial.serial_code = new_serial
                 if new_product_id:
-                    serial.product = Product.objects.get(product_id=new_product_id)
-                serial.updated_at = timezone.now()
+                    serial.item = get_object_or_404(ProductItem, item_id=new_product_id)
+                serial.updated_on = timezone.now()
                 serial.save()
 
-                save_api_log(
-                    request, "OwnAPI", request.data, {"status": "success"}, None,
-                    service_type="Update Serial Number", client_override="fintech_backend_db"
-                )
+                save_api_log(request, "OwnAPI", request.data, {"status": "success"}, None,
+                             service_type="Update Serial Number", client_override="fintech_backend_db")
 
-            return Response({
-                'status': 'success',
-                'message': 'Serial number updated'
-            }, status=status.HTTP_200_OK)
+            return Response({'status': 'success', 'message': 'Serial number updated'}, status=status.HTTP_200_OK)
 
-        except ItemSerial.DoesNotExist:
-            return Response({
-                'status': 'fail',
-                'message': 'Serial not found'
-            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            save_api_log(
-                request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
-                service_type="Update Serial Number", client_override="fintech_backend_db"
-            )
-            return Response({
-                'status': 'error',
-                'message': f'Internal server error: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            save_api_log(request, "OwnAPI", request.data, {"status": "error", "message": str(e)}, None,
+                         service_type="Update Serial Number", client_override="fintech_backend_db")
+            return Response({'status': 'error', 'message': f'Internal server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def delete(self, request):
         try:
             serial_id = request.data.get('serial_id')
             if not serial_id:
-                return Response({
-                    'status': 'fail',
-                    'message': 'Serial ID required'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'status': 'fail', 'message': 'Serial ID required'}, status=status.HTTP_400_BAD_REQUEST)
 
-            serial = ItemSerial.objects.get(serial_id=serial_id)
+            serial = get_object_or_404(ItemSerial, serial_id=serial_id)
             with transaction.atomic():
-                serial.is_deleted = True
-                serial.is_deactive = True
-                serial.updated_at = timezone.now()
+                serial.deactivated = True
+                serial.deleted = True
+                serial.updated_on = timezone.now()
                 serial.save()
 
-            return Response({
-                'status': 'success',
-                'message': 'Serial number deleted'
-            }, status=status.HTTP_200_OK)
+            return Response({'status': 'success', 'message': 'Serial number deleted'}, status=status.HTTP_200_OK)
 
-        except ItemSerial.DoesNotExist:
-            return Response({
-                'status': 'fail',
-                'message': 'Serial not found'
-            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': f'Internal server error: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'status': 'error', 'message': f'Internal server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

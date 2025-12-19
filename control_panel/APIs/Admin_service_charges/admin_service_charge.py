@@ -73,113 +73,94 @@ class ServiceChargesManagementView(APIView):
             return self._server_error(exc)
 
     def _build_provider_queryset(self, start_dt, end_dt, sp_id, service_id, hsn_id, search):
-        qs = ServiceProvider.objects.filter(is_deactive=False)
+        qs = ServiceProvider.objects.filter(is_inactive=False)  
 
         if start_dt:
-            qs = qs.filter(created_at__date__range=[start_dt, end_dt])
+            qs = qs.filter(last_updated__date__range=[start_dt, end_dt])
 
-        if sp_id:
-            qs = qs.filter(pk=sp_id)
+            qs = qs.filter(sp_id=sp_id) 
         if service_id:
             qs = qs.filter(service_id=service_id)
         if hsn_id:
-            qs = qs.filter(hsn_sac=hsn_id)
+            qs = qs.filter(hsn_code_id=hsn_id)
 
         if search:
             qs = qs.filter(
-                Q(service__service_name__icontains=search) |
-                Q(sp_name__icontains=search) |
-                Q(label__icontains=search) |
-                Q(hsn_sac__hsnsac_code__icontains=search)
+                Q(service__title__icontains=search) |
+                Q(display_label__icontains=search) |
+                Q(admin_code__icontains=search)
             )
 
-        return qs.order_by('-pk')
+        return qs.order_by('-sp_id')
 
     def _format_providers_with_charges(self, page_items, admin_rec, portal_usr, db_alias):
         results = []
-        child_mapping = {}
 
         for sp in page_items:
             charge_list = self._retrieve_applicable_charges(sp, admin_rec)
-            ad_sp_entry = AdServiceProvider.objects.using(db_alias).filter(sys_id=sp.sys_id).first()
-            is_provided_to_admin = ad_sp_entry.sa_provided if ad_sp_entry else True
+            is_provided_to_admin = True
 
             provider_info = {
                 'sp_id': sp.sp_id,
-                'service_name': sp.service.service_name if sp.service else None,
-                'provider_name': f"{sp.sp_name} (CLUB SERVICE)" if sp.club_key else sp.sp_name,
-                'provider_label': sp.label,
-                'tds_rate': sp.tds_rate,
-                'tds_type': sp.tds_type,
-                'hsn_sac_id': sp.hsn_sac.hsnsac_id if sp.hsn_sac else None,
-                'hsn_sac_code': sp.hsn_sac.hsnsac_code if sp.hsn_sac else None,
-                'tax_rate': sp.hsn_sac.tax_rate if sp.hsn_sac else None,
+                'service_name': sp.service.title if sp.service else "Unknown Service",
+                'provider_name': sp.display_label,
+                'provider_label': sp.display_label,
+                'tds_rate': float(sp.tds_percentage) if sp.tds_percentage else 0.0,
+                'tds_type': sp.tds_applicable or "WITHOUT_TDS",
+                'hsn_sac_id': sp.hsn_code_id if sp.hsn_code else None,
+                'hsn_sac_code': sp.hsn_code.hsnsac_code if sp.hsn_code else None,
+                'tax_rate': sp.hsn_code.tax_rate if sp.hsn_code else None,
                 'charges': charge_list,
                 'is_user_service_provider': is_provided_to_admin,
+                'parent_id': None,
+                'sub_service_provider': []
             }
-
-            if sp.parent_id is None:
-                provider_info.update({
-                    'parent_id': None,
-                    'sub_service_provider': []
-                })
-                results.append(provider_info)
-            else:
-                if sp.parent_id not in child_mapping:
-                    child_mapping[sp.parent_id] = {
-                        'parent_id': sp.parent_id,
-                        'sub_service_provider': []
-                    }
-                child_mapping[sp.parent_id]['sub_service_provider'].append(provider_info)
-
-        for child_group in child_mapping.values():
-            results.append(child_group)
+            results.append(provider_info)
 
         return results
 
     def _retrieve_applicable_charges(self, service_provider, admin):
         charge_list = []
 
-        if service_provider.sp_id not in [11, 12]:
-            admin_specific = AdminService.objects.filter(admin=admin, service_provider=service_provider)
-            if admin_specific.exists():
-                default_slabs = Charges.objects.filter(
-                    service_provider=service_provider,
-                    charge_category='to_us'
-                ).order_by('minimum')
+        admin_specific = AdminService.objects.filter(admin=admin, provider=service_provider)
+        if admin_specific.exists():
+            default_slabs = Charges.objects.filter(
+                service_provider=service_provider,
+                charge_category='to_us'
+            ).order_by('minimum')
 
-                for admin_svc in admin_specific:
-                    for slab in admin_svc.charges:
-                        category = slab.get('charge_category') or slab.get('charge_categoy')
-                        charge_list.append({
-                            'charge_type': slab.get('charge_type'),
-                            'minimum': slab.get('minimum'),
-                            'maximum': slab.get('maximum'),
-                            'rate_type': slab.get('rate_type'),
-                            'rate': slab.get('rate'),
-                            'charge_category': category
-                        })
+            for admin_svc in admin_specific:
+                for slab in admin_svc.charges or []:
+                    category = slab.get('charge_category') or slab.get('charge_categoy') or 'to_us'
+                    charge_list.append({
+                        'charge_type': slab.get('charge_type'),
+                        'minimum': slab.get('minimum'),
+                        'maximum': slab.get('maximum'),
+                        'rate_type': slab.get('rate_type'),
+                        'rate': slab.get('rate'),
+                        'charge_category': category
+                    })
 
-                for default in default_slabs:
-                    charge_list.append({
-                        'charge_type': default.charges_type,
-                        'minimum': default.minimum,
-                        'maximum': default.maximum,
-                        'rate_type': default.rate_type,
-                        'rate': default.rate,
-                        'charge_category': default.charge_category
-                    })
-            else:
-                defaults = Charges.objects.filter(service_provider=service_provider).order_by('minimum')
-                for item in defaults:
-                    charge_list.append({
-                        'charge_type': item.charges_type,
-                        'minimum': item.minimum,
-                        'maximum': item.maximum,
-                        'rate_type': item.rate_type,
-                        'rate': item.rate,
-                        'charge_category': item.charge_category
-                    })
+            for default in default_slabs:
+                charge_list.append({
+                    'charge_type': default.charges_type,
+                    'minimum': default.minimum,
+                    'maximum': default.maximum,
+                    'rate_type': default.rate_type,
+                    'rate': default.rate,
+                    'charge_category': default.charge_category
+                })
+        else:
+            defaults = Charges.objects.filter(service_provider=service_provider).order_by('minimum')
+            for item in defaults:
+                charge_list.append({
+                    'charge_type': item.charges_type,
+                    'minimum': item.minimum,
+                    'maximum': item.maximum,
+                    'rate_type': item.rate_type,
+                    'rate': item.rate,
+                    'charge_category': item.charge_category
+                })
 
         return charge_list
 
@@ -217,6 +198,7 @@ class ServiceChargesManagementView(APIView):
                 created_by=creator
             )
 
+
     @transaction.atomic
     def _handle_service_toggle(self, request):
         sp_id = request.data['sp_id']
@@ -227,108 +209,79 @@ class ServiceChargesManagementView(APIView):
             admin_obj = Admin.objects.get(admin_id=admin_id)
             client_db = switch_to_database(admin_obj.db_name)
 
-            if portal_usr.pu_status in ['PENDING', 'REJECT']:
-                return self._bad_request("Account not approved. Contact support.")
+            sp_obj = ServiceProvider.objects.get(sp_id=sp_id)
 
-            providers = ServiceProvider.objects.filter(Q(sp_id=sp_id) | Q(parent_id=sp_id))
-            main_provider = providers.first()
+            if hasattr(sp_obj, 'hsn_code') and sp_obj.hsn_code:
+                self._ensure_hsn_exists(sp_obj.hsn_code, portal_usr)
 
-            if not main_provider.is_charge_identifier:
-                # Standard provider flow
-                for sp in providers:
-                    service = SaCoreService.objects.filter(service_id=sp.service.service_id).first()
-                    self._ensure_hsn_exists(sp.hsn_sac, portal_usr)
+            slabs = Charges.objects.filter(
+                service_provider_id=sp_id,
+                charge_category='to_provide'
+            ).order_by('minimum')
 
-                    slabs = Charges.objects.filter(
-                        service_provider_id=sp.sp_id,
-                        charge_category='to_provide'
-                    ).order_by('minimum')
+            ad_sp = AdServiceProvider.objects.using(client_db).filter(
+                system_ref_id=sp_obj.sp_id,
+                self_managed=False
+            ).first()
 
-                    ad_sp = AdServiceProvider.objects.using(client_db).filter(
-                        sys_id=sp.sys_id, is_self_config=False
-                    ).first()
-                    if not ad_sp:
-                        continue
+            if ad_sp:
+                for slab in slabs:
+                    if not Adcharges.objects.using(client_db).filter(
+                        service_provider=ad_sp,
+                        charge_category='to_us',
+                        minimum=slab.minimum,
+                        maximum=slab.maximum
+                    ).exists():
+                        Adcharges.objects.using(client_db).create(
+                            service_provider=ad_sp,
+                            minimum=slab.minimum,
+                            maximum=slab.maximum,
+                            charges_type=slab.charges_type,
+                            rate_type=slab.rate_type,
+                            rate=slab.rate,
+                            charge_category='to_us',
+                            created_by=portal_usr
+                        )
 
-                    for slab in slabs:
-                        if not Adcharges.objects.using(client_db).filter(
-                            service_provider=ad_sp, charge_category='to_us',
-                            minimum=slab.minimum, maximum=slab.maximum
-                        ).exists():
-                            Adcharges.objects.using(client_db).create(
-                                service_provider=ad_sp,
-                                minimum=slab.minimum,
-                                maximum=slab.maximum,
-                                charges_type=slab.charges_type,
-                                rate_type=slab.rate_type,
-                                rate=slab.rate,
-                                charge_category='to_us',
-                                created_by=portal_usr
-                            )
+                new_status = not ad_sp.sa_provided
+                ad_sp.sa_provided = new_status
+                ad_sp.platform_fee_value = getattr(sp_obj, 'platform_charge', None) or 0
+                ad_sp.platform_fee_mode = getattr(sp_obj, 'charge_type', 'PERCENT')
+                ad_sp.api_credentials = getattr(sp_obj, 'api_credentials', {})
+                ad_sp.save(using=client_db)
 
-                    toggle_msg = self._toggle_provider_status(
-                        ad_sp, not ad_sp.sa_provided,
-                        sp.platform_fee, sp.platform_fee_type,
-                        sp.credentials_json, client_db
-                    )
-
+                toggle_msg = "Service Provider Activated Successfully." if new_status else "Service Provider Deactivated Successfully."
             else:
-                identifiers = SaCoreServiceIdentifier.objects.filter(sp__sp_id=sp_id)
-                for identifier in identifiers:
-                    self._ensure_hsn_exists(identifier.sp.hsn_sac, portal_usr)
+                toggle_msg = "Service Provider not found in admin configuration or is self-managed."
 
-                    slabs = Charges.objects.filter(
-                        service_provider_id=identifier.sp.sp_id,
-                        identifier_id=identifier.si_id,
-                        charge_category='to_provide'
-                    ).order_by('minimum')
 
-                    ad_sp = AdServiceProvider.objects.using(client_db).filter(
-                        sys_id=identifier.sp.sys_id, is_self_config=False
-                    ).first()
-                    if not ad_sp:
-                        continue
-
-                    for slab in slabs:
-                        if not Adcharges.objects.using(client_db).filter(
-                            service_provider=ad_sp, charge_identifier=identifier.si_id,
-                            charge_category='to_us', minimum=slab.minimum
-                        ).exists():
-                            Adcharges.objects.using(client_db).create(
-                                service_provider=ad_sp,
-                                charge_identifier=identifier.si_id,
-                                minimum=slab.minimum,
-                                maximum=slab.maximum,
-                                charges_type=slab.charges_type,
-                                rate_type=slab.rate_type,
-                                rate=slab.rate,
-                                charge_category='to_us',
-                                created_by=portal_usr
-                            )
-
-                    toggle_msg = self._toggle_provider_status(
-                        ad_sp, not ad_sp.sa_provided,
-                        identifier.sp.platform_fee, identifier.sp.platform_fee_type,
-                        identifier.sp.credentials_json, client_db
-                    )
-
-            admin_services = AdminService.objects.filter(service_provider_id=sp_id, admin__admin_id=admin_id)
+            admin_services = AdminService.objects.filter(
+                provider_id=sp_id,
+                admin__admin_id=admin_id
+            )
             for svc in admin_services:
-                svc.is_deactive = not svc.is_deactive
+                field = 'is_inactive' if hasattr(svc, 'is_inactive') else 'is_deactive'
+                setattr(svc, field, not getattr(svc, field))
                 svc.save()
 
-            all_admin_svcs = AdminService.objects.filter(service_provider_id=sp_id)
-            all_deactivated = all_admin_svcs.filter(is_deactive=True).count() == all_admin_svcs.count()
-            sp_main = ServiceProvider.objects.filter(sp_id=sp_id).first()
-            if sp_main:
-                sp_main.is_deactive = all_deactivated
-                sp_main.save()
 
-            return Response({'status': 'success', 'message': toggle_msg}, status=status.HTTP_200_OK)
+            all_admin_svcs = AdminService.objects.filter(provider_id=sp_id)
+            if all_admin_svcs.exists():
+                field = 'is_inactive' if hasattr(all_admin_svcs.first(), 'is_inactive') else 'is_deactive'
+                all_inactive = all_admin_svcs.filter(**{field: True}).count() == all_admin_svcs.count()
+                setattr(sp_obj, field, all_inactive)
+                sp_obj.save()
 
+            return Response({
+                'status': 'success',
+                'message': toggle_msg
+            }, status=status.HTTP_200_OK)
+
+        except ServiceProvider.DoesNotExist:
+            return self._bad_request("Service Provider not found.")
         except Exception as exc:
             return self._server_error(exc)
-
+        
     def _handle_charge_update(self, request):
         sp_id = request.data['sp_id']
         admin_id = request.data['admin_id']

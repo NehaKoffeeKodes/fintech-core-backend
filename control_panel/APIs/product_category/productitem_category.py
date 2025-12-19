@@ -22,36 +22,36 @@ class CategoryManagementView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def add_category(self, request):
-        try:
-            serializer = ProductItemSerializer(data=request.data, context={'request': request})
-            if serializer.is_valid():
-                with transaction.atomic():
-                    category = serializer.save(added_by=request.user)
+        serializer = ProductItemSerializer(
+            data=request.data,
+            context={'request': request}
+        )
 
-                    AdminActivityLog.objects.create(
-                        table_id=category.cat_id,
-                        table_name='item_category',
-                        ua_action='create',
-                        ua_description='New category added successfully',
-                        created_by=request.user,
-                        request_data=request.data,
-                        response_data=serializer.data
-                    )
+        if serializer.is_valid():
+            with transaction.atomic():
+                category = serializer.save(added_by=request.user)
 
-                return Response({
-                    'status': 'success',
-                    'message': 'Category created successfully.'
-                }, status=status.HTTP_201_CREATED)
-            else:
-                return Response({
-                    'status': 'fail',
-                    'message': serializer.errors
-                }, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as exc:
+                AdminActivityLog.objects.create(
+                    user=request.user,
+                    action='create',   # or update / delete
+                    description='New category added successfully',
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT'),
+                    request_data=request.data
+                )
+
+
             return Response({
-                'status': 'error',
-                'message': str(exc)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'status': 'success',
+                'message': 'Category created successfully.'
+            }, status=status.HTTP_201_CREATED)
+
+        return Response({
+            'status': 'fail',
+            'message': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
 
     def list_categories(self, request):
         try:
@@ -159,14 +159,14 @@ class CategoryManagementView(APIView):
                     updated_category = serializer.save(modified_on=datetime.now(), modified_by=request.user)
 
                     AdminActivityLog.objects.create(
-                        table_id=updated_category.cat_id,
-                        table_name='item_category',
-                        ua_action='update',
-                        ua_description='Category details updated',
-                        created_by=request.user,
-                        request_data=request.data,
-                        response_data=serializer.data
+                        user=request.user,
+                        action='update',
+                        description='category updated successfully',
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT'),
+                        request_data=request.data
                     )
+
                     
                     if 'inactive' in request.data:
                         action = "deactivated" if updated_category.inactive else "activated"
@@ -211,13 +211,13 @@ class CategoryManagementView(APIView):
                 category.save()
 
                 AdminActivityLog.objects.create(
-                    table_id=category.cat_id,
-                    table_name='item_category',
-                    ua_action='delete',
-                    ua_description='Category soft-deleted',
-                    created_by=request.user,
-                    request_data=request.data
-                )
+                        user=request.user,
+                        action='delete',
+                        description='category removed successfully',
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT'),
+                        request_data=request.data
+                    )
 
                 return Response({
                     'status': 'success',

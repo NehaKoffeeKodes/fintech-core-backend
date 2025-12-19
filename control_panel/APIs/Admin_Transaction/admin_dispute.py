@@ -28,18 +28,43 @@ class AdminDisputeRecordsView(APIView):
         page_num = int(request.data.get('page_num', 1))
         page_size = int(request.data.get('page_size', 10))
         query_text = request.data.get('query', '')
-        admin_ids = request.data.get('admin_ids', '')
-        provider_id = request.data.get('provider_id', '')
-        min_amt = request.data.get('min_amt', '')
-        max_amt = request.data.get('max_amt', '')
-        status_filter = request.data.get('complaint_status', '')
 
-        status_list = [s.strip() for s in status_filter.split(',') if s.strip()]
-        admin_id_list = [s.strip() for s in admin_ids.split(',') if s.strip()]
+        status_filter_raw = request.data.get('complaint_status', '')
+        if isinstance(status_filter_raw, (int, float)):
+            status_filter = str(int(status_filter_raw))
+        elif isinstance(status_filter_raw, list):
+            status_filter = ','.join(map(str, status_filter_raw))
+        else:
+            status_filter = str(status_filter_raw or '')
 
-        validation_resp = add_serial_numbers(page_num, page_size)
-        if validation_resp:
-            return validation_resp
+        status_list = [s.strip().upper() for s in status_filter.split(',') if s.strip()]
+
+        admin_ids_raw = request.data.get('admin_ids', '')
+        if isinstance(admin_ids_raw, (int, float)):
+            admin_ids = str(int(admin_ids_raw))
+        elif isinstance(admin_ids_raw, list):
+            admin_ids = ','.join(map(str, admin_ids_raw))
+        else:
+            admin_ids = str(admin_ids_raw or '')
+
+        admin_id_list = []
+        if admin_ids:
+            admin_id_list = [int(s.strip()) for s in admin_ids.split(',') if s.strip()]
+
+        provider_id_raw = request.data.get('provider_id')
+        provider_id = None
+        if provider_id_raw is not None:
+            try:
+                provider_id = str(provider_id_raw)
+            except:
+                pass
+
+        min_amt = request.data.get('min_amt')
+        max_amt = request.data.get('max_amt')
+
+        # validation_resp = add_serial_numbers(page_num, page_size)
+        # if validation_resp:
+        #     return validation_resp
 
         try:
             service_model_map = {
@@ -347,27 +372,47 @@ class AdminDisputeRecordsView(APIView):
 
             complaints_qs = Servicedispute.objects.all().order_by('-created_on')
 
-            if admin_ids:
-                complaints_qs = complaints_qs.filter(admin__admin_id__in=admin_id_list)
+            if admin_id_list:
+                complaints_qs = complaints_qs.filter(admin__in=admin_id_list)
+
             if query_text:
-                complaints_qs = complaints_qs.filter(
-                    Q(txn_ref__icontains=query_text) |
-                    Q(provider__provider_name__icontains=query_text) |
-                    Q(admin_name__icontains=query_text)
-                )
-            if status_filter:
-                complaints_qs = complaints_qs.filter(complaint_status__in=status_list)
+                base_q = Q(txn_ref__icontains=query_text)
+                admin_ids = Admin.objects.filter(name__icontains=query_text).values_list('admin_id', flat=True)
+                if admin_ids:
+                    base_q |= Q(admin__in=admin_ids)
+
+                provider_ids = ServiceProvider.objects.filter(display_label__icontains=query_text).values_list('sp_id', flat=True)
+                if provider_ids:
+                    base_q |= Q(provider_id__in=provider_ids)
+
+                complaints_qs = complaints_qs.filter(base_q)
+
             if provider_id:
-                complaints_qs = complaints_qs.filter(provider_id=int(provider_id))
+                complaints_qs = complaints_qs.filter(provider_id=provider_id)  # already str → int safe
 
-            complaints_qs = apply_date_range_filter(request, complaints_qs)
+            complaints_qs = apply_date_range_filter(request.data, complaints_qs, date_field='created_on')
 
-            if min_amt and max_amt:
-                complaints_qs = complaints_qs.filter(amount__gte=min_amt, amount__lte=max_amt)
-            elif min_amt:
-                complaints_qs = complaints_qs.filter(amount__gte=min_amt)
-            elif max_amt:
-                complaints_qs = complaints_qs.filter(amount__lte=max_amt)
+            min_amt_raw = request.data.get('min_amt')
+            max_amt_raw = request.data.get('max_amt')
+
+            min_amt = None
+            if min_amt_raw not in (None, '', []):
+                try:
+                    min_amt = float(min_amt_raw)
+                except (ValueError, TypeError):
+                    pass 
+
+            max_amt = None
+            if max_amt_raw not in (None, '', []):
+                try:
+                    max_amt = float(max_amt_raw)
+                except (ValueError, TypeError):
+                    pass 
+
+            if min_amt is not None:
+                complaints_qs = complaints_qs.filter(txn_amount__gte=min_amt)
+            if max_amt is not None:
+                complaints_qs = complaints_qs.filter(txn_amount__lte=max_amt)
 
             start_idx = (page_num - 1) * page_size
             end_idx = start_idx + page_size
@@ -423,7 +468,7 @@ class AdminDisputeRecordsView(APIView):
                 item['txn_amount'] = getattr(txn_record, map_entry['amount_field'], None)
                 item['txn_current_status'] = getattr(txn_record, map_entry['status_field'], None)
 
-            add_serial_numbers(page_num, page_size, serialized_data, 'desc')
+            pagination_result = add_serial_numbers(serialized_data, page_num, page_size, 'desc')
 
             return Response({
                 'status': 'success',

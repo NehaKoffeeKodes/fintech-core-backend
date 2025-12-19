@@ -111,10 +111,10 @@ class SuperAdminTransactionReportView(APIView):
 
                 try:
                     global_transactions = GlTrn.objects.using(db_alias).filter(
-                        pu_id=1, effectvie_wallet="main_wallet"
+                        member_id=1,wallet_type="main_wallet"
                     )
 
-                    user_ids = [gt.pu_id for gt in global_transactions]
+                    user_ids = [gt.member_id for gt in global_transactions]
                     portal_user_cache = PortalUser.objects.using(db_alias).in_bulk(user_ids)
 
                     for global_trn in global_transactions:
@@ -185,7 +185,7 @@ class SuperAdminTransactionReportView(APIView):
                 current_page = paginator.get_page(1)
 
             page_data = list(current_page.object_list)
-            add_serial_numbers(page_num, page_sz, page_data, order_direction)
+            add_serial_numbers(page_data, page_num, page_sz, order_direction)
 
             response_payload = {
                 "total_items": total_count,

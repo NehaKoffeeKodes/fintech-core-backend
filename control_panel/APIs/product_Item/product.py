@@ -66,8 +66,8 @@ class ProductManagementView(APIView):
     def retrieve_items(self, request):
         try:
             item_id = request.data.get('item_id')
-            page_size = int(request.data.get('page_size', 10))
-            page_num = int(request.data.get('page_num', 1))
+            page_size_raw = request.data.get('page_size', 10)
+            page_num_raw = request.data.get('page_num', 1)
             start = request.data.get('from_date')
             end = request.data.get('to_date')
             search = request.data.get('search')
@@ -75,9 +75,14 @@ class ProductManagementView(APIView):
             inactive_filter = request.data.get('inactive')
             sort_order = request.data.get('sort', 'desc')
 
-            validation = validate_paging_inputs(page_num, page_size)
-            if validation:
-                return validation
+            try:
+                page_size = int(page_size_raw)
+                page_num = int(page_num_raw)
+            except ValueError:
+                return Response({'status': 'fail', 'message': 'Invalid pagination values.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if page_num < 1 or page_size < 1:
+                return Response({'status': 'fail', 'message': 'page_num and page_size must be >= 1.'}, status=status.HTTP_400_BAD_REQUEST)
 
             qs = ProductItem.objects.filter(removed=False)
 
@@ -85,7 +90,7 @@ class ProductManagementView(APIView):
                 qs = qs.filter(pk=item_id)
 
             if inactive_filter is not None:
-                qs = qs.filter(inactive=(inactive_filter == 'true'))
+                qs = qs.filter(inactive=(str(inactive_filter).lower() == 'true'))
 
             if start and end:
                 try:
@@ -102,7 +107,7 @@ class ProductManagementView(APIView):
                     Q(details__icontains=search)
                 )
 
-            if cat_filter and cat_filter != "0":
+            if cat_filter and str(cat_filter) != "0":
                 qs = qs.filter(category_id=cat_filter)
 
             qs = qs.order_by('pk' if sort_order == 'asc' else '-pk')
@@ -135,6 +140,7 @@ class ProductManagementView(APIView):
 
         except Exception as exc:
             return Response({'status': 'error', 'message': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     def put(self, request):
         item_id = request.data.get('item_id')

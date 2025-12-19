@@ -1,14 +1,18 @@
-from ...views import*
-
+from ...views import *
+import os
+import time
+import string
+import random
+import jwt
+import requests
+from datetime import datetime  
 
 def generate_random_string(length=12):
     characters = string.ascii_letters + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
 
-
 def get_current_timestamp_ms():
     return str(int(time.time() * 1000))
-
 
 def generate_paysprint_jwt():
     secret = os.getenv("PAYSPRINT_JWT_SECRET")
@@ -29,7 +33,6 @@ def generate_paysprint_jwt():
     token = jwt.encode(payload, secret.encode(), algorithm="HS256")
     return token
 
-
 def get_instantpay_headers():
     return {
         "X-Ipay-Auth-Code": os.getenv("INSTANTPAY_AUTH_CODE"),
@@ -39,6 +42,7 @@ def get_instantpay_headers():
         "X-Ipay-Outlet-Id": os.getenv("INSTANTPAY_OUTLET_ID"),
     }
 
+# ----------------- GatewayBalanceView -----------------
 
 class GatewayBalanceView(APIView):
     permission_classes = [IsAuthenticated]
@@ -53,47 +57,40 @@ class GatewayBalanceView(APIView):
 
     def get(self, request):
         try:
-            gateways = ServiceProvider.objects.filter(is_deleted=False)
+            gateways = ServiceProvider.objects.filter(is_removed=False)
 
             gateway_data = gateways.values(
-                'gateway_id',
-                'gateway_name',
-                'provider_name',
-                'current_balance',
-                'supports_balance_check'
-            ).order_by('provider_name')
+                'sp_id',
+                'display_label',
+                'admin_code',
+                'supports_balance_check',
+                'wallet_type',
+                'tds_applicable'
+            ).order_by('display_label')
 
-            response = {
-                "results": list(gateway_data)
-            }
+            response = {"results": list(gateway_data)}
 
             return Response({
                 'status': 'success',
                 'message': 'Gateway balances retrieved successfully',
                 'data': response
-            }, status=status.HTTP_200_OK)
+            }, status=200)
 
         except Exception as e:
             return Response({
                 'status': 'error',
                 'message': f'Server error: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            }, status=500)
 
     def post(self, request):
         provider_key = request.data.get("provider_name", "").strip().lower()
 
         if not provider_key:
-            return Response({
-                "status": "error",
-                "message": "provider_name is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status": "error", "message": "provider_name is required"}, status=400)
 
         handler_name = self.PROVIDER_HANDLERS.get(provider_key)
         if not handler_name:
-            return Response({
-                "status": "error",
-                "message": f"Provider '{provider_key}' is not supported"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status": "error", "message": f"Provider '{provider_key}' is not supported"}, status=400)
 
         handler_method = getattr(self, handler_name)
         return handler_method(request)
@@ -134,7 +131,7 @@ class GatewayBalanceView(APIView):
             if balance_data.get("subCode") == "200":
                 balance = balance_data.get("data", {}).get("availableBalance", 0)
 
-                ServiceProvider.objects.filter(provider_name__iexact="CashFree").update(current_balance=balance)
+                ServiceProvider.objects.filter(admin_code__iexact="cashfree").update(current_balance=balance)
 
                 return Response({
                     'status': 'success',
@@ -173,7 +170,7 @@ class GatewayBalanceView(APIView):
             if data.get("status") is True and data.get("response_code") == 1:
                 balance = data.get("cdwallet", 0)
 
-                ServiceProvider.objects.filter(provider_name__iexact="paysprint").update(current_balance=balance)
+                ServiceProvider.objects.filter(admin_code__iexact="paysprint").update(current_balance=balance)
 
                 return Response({
                     'status': 'success',
@@ -200,15 +197,12 @@ class GatewayBalanceView(APIView):
         try:
             token = request.data.get('token')
             if not token:
-                return Response({
-                    "status": "error",
-                    "message": "Authentication token is required for Nobal"
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"status": "error", "message": "Authentication token is required for Nobal"}, status=400)
 
             url = "https://service.noblewebstudio.in/api/v1.0/airtel_dmt/partner_balance"
             headers = {
                 'Authorization': f'Bearer {token}',
-                'X-Timestamp': datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+                'X-Timestamp': datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00"),  # fixed
                 'Content-Type': 'application/json'
             }
 
@@ -216,30 +210,19 @@ class GatewayBalanceView(APIView):
             data = response.json()
 
             if data.get("status") is True and data.get("response_code") == 1:
-                balance = data.get("data", {}).get("balance", 0)  
-
+                balance = data.get("data", {}).get("balance", 0)
                 ServiceProvider.objects.filter(provider_name__iexact="Nobal").update(current_balance=balance)
 
                 return Response({
                     'status': 'success',
                     'message': 'Nobal balance updated',
-                    'data': {
-                        'provider_name': 'Nobal',
-                        'current_balance': balance
-                    }
-                }, status=status.HTTP_200_OK)
+                    'data': {'provider_name': 'Nobal', 'current_balance': balance}
+                }, status=200)
 
-            return Response({
-                "status": "error",
-                "message": "Failed to fetch Nobal balance",
-                "details": data
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status": "error", "message": "Failed to fetch Nobal balance", "details": data}, status=400)
 
         except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': f'Error: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'status': 'error', 'message': f'Error: {str(e)}'}, status=500)
 
     def fetch_instantpay_balance(self, request):
         try:

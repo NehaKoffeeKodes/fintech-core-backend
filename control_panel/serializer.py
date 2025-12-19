@@ -694,13 +694,13 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
 
 
 class ProductItemSerializer(serializers.ModelSerializer):
-    item_status = serializers.SerializerMethodField()
-    item_images = serializers.SerializerMethodField()
+    # item_status = serializers.SerializerMethodField()
+    # item_images = serializers.SerializerMethodField()
 
     class Meta:
-        model = ProductItem
-        fields = '__all__'
-        read_only_fields = ('added_on', 'added_by', 'modified_on')
+        model = ProductItemCategory
+        fields = ['cat_id','name','description','parent_cat','inactive']
+        read_only_fields = ('cat_id',)
 
     def get_item_status(self, obj):
         return "Active" if not obj.inactive else "Inactive"

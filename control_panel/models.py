@@ -166,7 +166,7 @@ class ServiceProvider(models.Model):
     TDS_WITH = 'WITH_TDS'
     TDS_WITHOUT = 'WITHOUT_TDS'
     TDS_OPTIONS = [(TDS_WITH, 'With TDS'), (TDS_WITHOUT, 'Without TDS')]
-    admin_id = models.AutoField(primary_key=True)
+    sp_id = models.AutoField(primary_key=True)
     service = models.ForeignKey(SaCoreService, on_delete=models.CASCADE, related_name='admins')
     admin_code = models.CharField(max_length=100, unique=True)
     display_label = models.CharField(max_length=200)
@@ -181,6 +181,7 @@ class ServiceProvider(models.Model):
     platform_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     charge_type = models.CharField(max_length=10, null=True, blank=True)
     last_updated = models.DateTimeField(auto_now=True)
+    current_balance = models.DecimalField(max_digits=20, decimal_places=2, default=0)
     updated_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True)
     is_inactive = models.BooleanField(default=False)
     is_removed = models.BooleanField(default=False)
@@ -745,7 +746,7 @@ class ChargeCategory(models.Model):
 
 class ItemSerial(models.Model):
     serial_id = models.AutoField(primary_key=True)
-    item = models.ForeignKey(GadgetItem, on_delete=models.PROTECT, null=True, blank=True)
+    item = models.ForeignKey(ProductItem, on_delete=models.PROTECT, null=True, blank=True) 
     serial_code = models.CharField(max_length=255, unique=True)
     assigned_user = models.IntegerField(null=True, blank=True)
     deactivated = models.BooleanField(blank=True, null=True)
@@ -760,6 +761,7 @@ class ItemSerial(models.Model):
 
     def __str__(self):
         return self.serial_code
+
 
 
 class GadgetPurchase(models.Model):

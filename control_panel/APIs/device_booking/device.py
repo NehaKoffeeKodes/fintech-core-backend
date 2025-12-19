@@ -51,9 +51,9 @@ class GadgetPurchaseAPIView(APIView):
 
             item = GadgetItem.objects.get(item_id=item_id)
             current_user = PortalUser.objects.get(id=request.user.id)
-            user_wallet = PortalUserBalance.objects.get(pu=current_user)
+            user_wallet = PortalUserBalance.objects.get(user=current_user)
 
-            if user_wallet.main_wallet < total_amount:
+            if user_wallet.primary_balance < total_amount:
                 return Response({'status': 'fail', 'message': 'Not enough balance in main wallet.'}, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
@@ -65,13 +65,13 @@ class GadgetPurchaseAPIView(APIView):
                     remaining_qty=qty,
                     grand_total=total_amount,
                     order_ref=ref_code,
-                    buyer_name=current_user.pu_name,
-                    buyer_phone=current_user.pu_mobile_number,
+                    buyer_name=current_user.full_name,          
+                    buyer_phone=current_user.mobile_number,  
                     initiated_by=request.user.id
                 )
 
-                user_wallet.main_wallet -= total_amount
-                user_wallet.lien_wallet += total_amount
+                user_wallet.primary_balance -= total_amount
+                user_wallet.hold_balance += total_amount
                 user_wallet.save()
 
                 HoldTransaction.objects.create(
@@ -115,7 +115,7 @@ class GadgetPurchaseAPIView(APIView):
             if status:
                 qs = qs.filter(status=status)
 
-            qs = apply_date_range_filter(request, qs)
+            qs = apply_date_range_filter(request.data, qs)
 
             paginator = Paginator(qs, page_size)
             try:
@@ -145,10 +145,10 @@ class GadgetPurchaseAPIView(APIView):
                     'total_records': paginator.count,
                     'records': serialized
                 }
-            }, status=status.HTTP_200_OK)
+            }, status=200)
 
         except Exception as e:
-            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'status': 'error', 'message': str(e)}, status=500)
 
     def put(self, request):
         try:
@@ -159,46 +159,84 @@ class GadgetPurchaseAPIView(APIView):
             serial_codes = request.data.get('serials', '')
 
             if not purchase_id or not new_status:
-                return Response({'status': 'fail', 'message': 'Purchase ID and status required.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'status': 'fail', 'message': 'Purchase ID and status required.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            token = request.META.get('HTTP_AUTHORIZATION', '').split(' ')[1]
+            payload = TokenBackend(algorithm='HS256').decode(token, verify=False)
+            user_role = payload.get('role')
 
             purchase = GadgetPurchase.objects.get(purchase_id=purchase_id)
+
             admin = Admin.objects.get(mobile_number=purchase.buyer_phone)
             switch_to_database(admin.db_name)
 
-            portal_user = PortalUser.objects.using(admin.db_name).get(pu_mobile_number=admin.mobile_number)
-            wallet = PortalUserBalance.objects.using(admin.db_name).get(pu=portal_user)
+            portal_user = PortalUser.objects.using(admin.db_name).get(
+                mobile_number=admin.mobile_number
+            )
 
-            if request.user.pu_role == 'ADMIN' and new_status == 'CANCELLED' and purchase.status == 'PENDING':
+            wallet = PortalUserBalance.objects.using(admin.db_name).get(
+                user=portal_user
+            )
+
+            if (
+                user_role == 'ADMIN'
+                and new_status == 'CANCELLED'
+                and purchase.status == 'PENDING'
+            ):
                 refund_amt = Decimal(str(purchase.grand_total))
-                wallet.main_wallet += refund_amt
-                wallet.lien_wallet -= refund_amt
+
+                wallet.primary_balance += refund_amt
+                wallet.hold_balance -= refund_amt
                 wallet.save(using=admin.db_name)
+
                 purchase.status = 'CANCELLED'
                 purchase.save()
-                return Response({'status': 'success', 'message': 'Purchase cancelled.'})
+
+                return Response(
+                    {'status': 'success', 'message': 'Purchase cancelled.'},
+                    status=status.HTTP_200_OK
+                )
 
             if purchase.status not in ['PENDING', 'PARTIALLY APPROVED']:
-                return Response({'status': 'fail', 'message': 'Only pending orders can be processed.'})
+                return Response(
+                    {'status': 'fail', 'message': 'Only pending orders can be processed.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             if new_status == 'REJECTED':
-                refund = Decimal(purchase.remaining_qty) * purchase.per_unit_cost
-                wallet.main_wallet += refund
-                wallet.lien_wallet -= refund
+                refund_amt = Decimal(purchase.remaining_qty) * purchase.per_unit_cost
+
+                wallet.primary_balance += refund_amt
+                wallet.hold_balance -= refund_amt
                 wallet.save(using=admin.db_name)
+
                 purchase.status = 'REJECTED'
                 purchase.save()
-                return Response({'status': 'success', 'message': 'Purchase rejected.'})
+
+                return Response(
+                    {'status': 'success', 'message': 'Purchase rejected.'},
+                    status=status.HTTP_200_OK
+                )
 
             if new_status in ['APPROVED', 'PARTIALLY APPROVED']:
                 serial_list = [s.strip() for s in serial_codes.split(',') if s.strip()]
                 if not serial_list:
-                    return Response({'status': 'fail', 'message': 'Serial numbers required for approval.'})
+                    return Response(
+                        {'status': 'fail', 'message': 'Serial numbers required.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
                 approve_count = len(serial_list)
                 deduct_amount = purchase.per_unit_cost * approve_count
 
-                if wallet.lien_wallet < deduct_amount:
-                    return Response({'status': 'fail', 'message': 'Insufficient lien balance.'})
+                if wallet.hold_balance < deduct_amount:
+                    return Response(
+                        {'status': 'fail', 'message': 'Insufficient hold balance.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
                 with transaction.atomic():
                     valid_serials = ItemSerial.objects.filter(
@@ -209,34 +247,43 @@ class GadgetPurchaseAPIView(APIView):
                     )
 
                     if valid_serials.count() != approve_count:
-                        return Response({'status': 'fail', 'message': 'Invalid or duplicate serials.'})
+                        return Response(
+                            {'status': 'fail', 'message': 'Invalid or duplicate serials.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
-                    wallet.lien_wallet -= deduct_amount
+                    wallet.hold_balance -= deduct_amount
                     wallet.save(using=admin.db_name)
-
                     purchase.item.available_stock -= approve_count
                     purchase.item.save()
 
                     ad_item, _ = AdGadgetItem.objects.using(admin.db_name).get_or_create(
                         title=purchase.item.title,
                         defaults={
-                            'category': AdGadgetCategory.objects.using(admin.db_name).filter(name=purchase.item.category.name).first(),
+                            'category': AdGadgetCategory.objects.using(admin.db_name)
+                            .filter(name=purchase.item.category.name)
+                            .first(),
                             'info': purchase.item.info,
                             'cost': purchase.item.cost,
                             'images': purchase.item.images,
-                            'stock': approve_count,
+                            'stock': 0,
                             'created_by': portal_user.id
                         }
                     )
+
                     ad_item.stock += approve_count
                     ad_item.save(using=admin.db_name)
 
-                    current_serials = purchase.allocated_serials.get('serial_numbers', []) if purchase.allocated_serials else []
+                    current_serials = purchase.allocated_serials.get(
+                        'serial_numbers', []
+                    ) if purchase.allocated_serials else []
+
                     new_serials = []
                     for s in valid_serials:
                         s.deactivated = True
                         s.assigned_user = admin.pk
                         s.save()
+
                         new_serials.append(s.serial_code)
 
                         AdItemSerial.objects.using(admin.db_name).create(
@@ -245,33 +292,55 @@ class GadgetPurchaseAPIView(APIView):
                             created_by=portal_user.id
                         )
 
-                    purchase.allocated_serials = {'serial_numbers': current_serials + new_serials}
+                    purchase.allocated_serials = {
+                        'serial_numbers': current_serials + new_serials
+                    }
                     purchase.tracking_no = tracking_no
                     purchase.shipping_partner = courier
-                    purchase.status = 'APPROVED' if approve_count == purchase.remaining_qty else 'PARTIALLY APPROVED'
+                    purchase.status = (
+                        'APPROVED'
+                        if approve_count == purchase.remaining_qty
+                        else 'PARTIALLY APPROVED'
+                    )
                     purchase.remaining_qty -= approve_count
                     purchase.save()
 
-                    for cat in GadgetCategory.objects.filter(deleted=False, inactive=False):
-                        AdGadgetCategory.objects.using(admin.db_name).get_or_create(
-                            name=cat.name,
-                            parent=cat.parent,
-                            defaults={'info': cat.details}
-                        )
+                    label = super_admin_action_label(
+                        "Gadget Purchase",
+                        deduct_amount,
+                        purchase.order_ref,
+                        "Admin"
+                    )
 
-                    label = super_admin_action_label("Gadget Purchase", deduct_amount, purchase.order_ref, "Admin")
                     WalletHistory.objects.using(admin.db_name).create(
-                        pu=portal_user,
+                        user=portal_user,
                         action_type='Debit for Gadget',
                         wl_label=label,
-                        effectvie_wallet='main_wallet',
+                        effectvie_wallet='primary_balance',
                         effectvie_amt=deduct_amount,
                         effective_type='DR',
-                        current_balance=wallet.main_wallet,
+                        current_balance=wallet.primary_balance,
                         wl_trn_dt=timezone.now()
                     )
 
-                return Response({'status': 'success', 'message': f'Purchase {purchase.status.lower()} successfully.'})
+                return Response(
+                    {'status': 'success', 'message': f'Purchase {purchase.status.lower()} successfully.'},
+                    status=status.HTTP_200_OK
+                )
+
+            return Response(
+                {'status': 'fail', 'message': 'Invalid status transition.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        except GadgetPurchase.DoesNotExist:
+            return Response(
+                {'status': 'fail', 'message': 'Purchase not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         except Exception as e:
-            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {'status': 'error', 'message': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

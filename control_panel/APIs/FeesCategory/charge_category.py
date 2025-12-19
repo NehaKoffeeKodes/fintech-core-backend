@@ -28,12 +28,14 @@ class ChargeCategoryView(APIView):
                     category = serializer.save(added_by=request.user)
 
                     AdminActivityLog.objects.create(
-                        table_id=category.category_id,
-                        table_name='charge_category',
-                        ua_action='create',
-                        ua_description=f'Created charge category: {category.category_name}',
-                        created_by=request.user
+                        user=request.user,
+                        action='CREATE',
+                        description=f'Created charge category: {category.category_name}',
+                        request_data=request.data,
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT')
                     )
+
 
                     return Response({
                         'status': 'success',
@@ -145,12 +147,14 @@ class ChargeCategoryView(APIView):
                 serializer.save(modified_on=datetime.now())
 
                 AdminActivityLog.objects.create(
-                    table_id=category.category_id,
-                    table_name='charge_category',
-                    ua_action='update',
-                    ua_description=f'Updated category name to: {new_name}',
-                    created_by=request.user
+                    user=request.user,
+                    action='UPDATE',
+                    description=f'Updated category name to: {new_name}',
+                    request_data=request.data,
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT')
                 )
+
 
                 return Response({
                     'status': 'success',
@@ -182,12 +186,14 @@ class ChargeCategoryView(APIView):
             category.save()
 
             AdminActivityLog.objects.create(
-                table_id=category.category_id,
-                table_name='charge_category',
-                ua_action='delete',
-                ua_description=f'Soft deleted category: {category.category_name}',
-                created_by=request.user
+                user=request.user,
+                action='DELETE',
+                description=f'Soft deleted category: {category.category_name}',
+                request_data=request.data,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT')
             )
+
 
             return Response({
                 'status': 'success',
