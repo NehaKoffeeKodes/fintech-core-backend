@@ -7,7 +7,8 @@ from datetime import timedelta
 import jwt
 from jwt import encode, decode, ExpiredSignatureError, InvalidTokenError
 from django.conf import settings
-
+from rest_framework.permissions import AllowAny,IsAuthenticated
+from control_panel.serializer import SmtpEmailSerializer
 from web_portal.models import *
 from authentication.customjwt_auth import *
 from authentication.permissions import*
@@ -20,25 +21,19 @@ from uuid import uuid4
 from io import BytesIO
 import pyotp
 import qrcode
-
-
+from web_portal.APIs.latestnews_update.news_hub import ALLOWED_DOMAIN
 import math
 from django.db.models import Q
-
 import random
 import string
 import re
-
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import exceptions
-
 import logging
 from typing import Optional, Tuple
-
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.request import Request
-
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework import status
 from web_portal.models import AdminAccount

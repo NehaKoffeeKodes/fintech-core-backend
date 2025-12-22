@@ -8,6 +8,8 @@ from django.views import View
 from django.conf import settings
 import json
 
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class SendOTPEmailAPI(View):
     def post(self, request):

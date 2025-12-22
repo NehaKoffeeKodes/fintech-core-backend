@@ -47,7 +47,6 @@ class IsDistributor(BasePermission):
             return False
 
         try:
-            # Get user with minimal fields
             app_user = PortalUser.objects.only('role').get(id=request.user.id)
             
             if app_user.role.lower() != 'wholesaler':
@@ -56,14 +55,13 @@ class IsDistributor(BasePermission):
             token = request.auth
             if isinstance(token, bytes):
                 token = token.decode('utf-8')
-
-            # Check if session exists and is active
+                
             session_exists = UserLoginSession.objects.filter(
                 user=app_user,
                 access_token=token,
                 is_logged_out=False,
                 logout_at__isnull=True,
-                last_active_at__gt=timezone.now() - timezone.timedelta(hours=24)  # 24-hour validity example
+                last_active_at__gt=timezone.now() - timezone.timedelta(hours=24)  
             ).exists()
 
             if not session_exists:
@@ -79,14 +77,10 @@ class IsDistributor(BasePermission):
         except exceptions.AuthenticationFailed:
             raise
         except Exception as e:
-            # In production: log this error
             return False
 
 
 class IsRetailer(BasePermission):
-    """
-    Allows access only to authenticated DEALER with valid non-expired session
-    """
     def has_permission(self, request, view) -> bool:
         if not request.user.is_authenticated:
             return False
@@ -101,7 +95,6 @@ class IsRetailer(BasePermission):
             if hasattr(jwt_token, 'decode'):
                 jwt_token = jwt_token.decode('utf-8') if isinstance(jwt_token, bytes) else str(jwt_token)
 
-            # Validate active session
             is_valid_session = UserLoginSession.objects.filter(
                 user=current_user,
                 access_token=jwt_token,

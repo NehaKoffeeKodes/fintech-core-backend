@@ -7,9 +7,6 @@ from django.conf import settings
 from django.utils.timezone import localtime
 
 def export_institutions_to_excel(data_qs, column_mapping, file_prefix):
-    """
-    Exports queryset to Excel with proper formatting.
-    """
     wb = Workbook()
     ws = wb.active
     ws.title = "Institutions"
@@ -23,11 +20,9 @@ def export_institutions_to_excel(data_qs, column_mapping, file_prefix):
         for field in fields:
             val = getattr(record, field, '')
 
-            # Boolean to TRUE/FALSE
             if field in ['supports_payout', 'supports_funding', 'is_inactive']:
                 val = 'TRUE' if val else 'FALSE'
 
-            # JSON fields to string
             if isinstance(val, (dict, list)):
                 val = json.dumps(val)
 

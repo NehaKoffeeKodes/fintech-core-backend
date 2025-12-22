@@ -1,11 +1,13 @@
-# # utils/database_router.py or wherever you keep this
-
 import os
 import json
 from django.conf import settings
 from django.db import connections
 from admin_hub.models import Adcharges, AdServiceProvider
-from admin_hub.thread_local import get_current_request  # adjust import if needed
+from admin_hub.thread_local import get_current_request 
+from dotenv import load_dotenv
+from django.db.utils import ConnectionHandler
+from user_agents import parse
+from utils.log_file.log import save_api_log
 
 # DATABASE_MAPPING = json.loads(os.getenv("ALLOWED_DOMAINS", "[]"))
 
@@ -41,23 +43,11 @@ from admin_hub.thread_local import get_current_request  # adjust import if neede
 #     return db_name
 
 
-# utils/api_helpers.py
-
-import os
-import json
-from dotenv import load_dotenv
-from django.conf import settings
-from django.db import connections, connection
-from django.db.utils import ConnectionHandler
-from user_agents import parse
-
-from utils.log_file.log import save_api_log
 
 
 
 load_dotenv()
 
-# Load domain-to-database mapping from environment
 DOMAIN_DB_MAPPING_JSON = os.getenv("DOMAIN_DB_MAPPING", "[]")
 
 try:
@@ -68,17 +58,11 @@ except json.JSONDecodeError as err:
 
 
 def get_database_from_domain():
-    """
-    Determines the correct tenant database based on request domain/origin.
-    Connects to it dynamically if found.
-    Returns database alias or None.
-    """
     try:
         request = get_current_request()
         if not request:
             return None
 
-        # Extract clean domain
         raw_domain = (
             request.META.get("HTTP_DOMAIN") or
             request.META.get("HTTP_ORIGIN") or
@@ -100,26 +84,19 @@ def get_database_from_domain():
 
 
 def validate_app_version(request):
-    """
-    Checks if the incoming request version matches the allowed version (for mobile apps).
-    Returns True if version is acceptable or if not applicable (web).
-    """
     try:
         allowed_version = os.getenv("APP_VERSION")
         user_agent = request.META.get("HTTP_USER_AGENT", "")
 
-        if "Dart/" in user_agent:  # Mobile app request
+        if "Dart/" in user_agent: 
             incoming_version = request.META.get("HTTP_VERSION")
             return incoming_version == allowed_version if allowed_version else False
-        return True  # Web requests always pass
+        return True  
     except Exception:
         return False
 
 
 def verify_service_provider_access(sp_id: int, provider_env_key: str) -> bool:
-    """
-    Validates if the given service provider ID is active and matches the expected one from env.
-    """
     try:
         provider = AdServiceProvider.objects.get(sp_id=sp_id)
         if provider.is_deactive:
@@ -135,12 +112,9 @@ def verify_service_provider_access(sp_id: int, provider_env_key: str) -> bool:
 
 
 def is_service_assigned_to_user(request, service_provider_id: int) -> bool:
-    """
-    Checks if the logged-in portal user has the given service provider assigned.
-    """
     try:
         current_user = request.user
-        portal_user = current_user.portaluser  # Assuming related name or proper access
+        portal_user = current_user.portaluser  
         assigned_services = portal_user.assign_service or []
 
         return int(service_provider_id) in assigned_services
@@ -150,10 +124,6 @@ def is_service_assigned_to_user(request, service_provider_id: int) -> bool:
 
 
 def switch_to_database(db_alias: str) -> str:
-    """
-    Dynamically adds a new database connection to Django settings if not already present.
-    Reuses default DB credentials.
-    """
     if db_alias in settings.DATABASES:
         return db_alias
 
@@ -172,7 +142,6 @@ def switch_to_database(db_alias: str) -> str:
         'TIME_ZONE': None,
     }
 
-    # Refresh connection handler
     connections._connections = ConnectionHandler(settings.DATABASES)
     return db_alias
 
@@ -194,10 +163,6 @@ def calculate_and_apply_charges(
     sub_service_id=None,
     portal_user_id=None
 ) -> bool:
-    """
-    Core function to calculate admin commission, GST, and trigger charge processing.
-    Returns True on success, False on failure.
-    """
     try:
         save_api_log(
             request, "InternalAPI", request.data,
@@ -206,8 +171,6 @@ def calculate_and_apply_charges(
         )
 
         gst_percentage = float(provider_instance.hsn_sac.tax_rate or 0)
-
-        # Find applicable admin charge slab
         charge_slabs = Adcharges.objects.filter(service_provider_id=provider_id)
         selected_charge = None
 
@@ -217,9 +180,8 @@ def calculate_and_apply_charges(
                     selected_charge = slab
                     break
             if not selected_charge:
-                selected_charge = charge_slabs.first()  # fallback to first
-
-        # Default values if no charge found
+                selected_charge = charge_slabs.first()  
+                
         if selected_charge:
             charge_rate = selected_charge.rate
             rate_is_percent = selected_charge.rate_type == "is_percent"
@@ -229,10 +191,7 @@ def calculate_and_apply_charges(
             rate_is_percent = False
             charge_nature = None
 
-        # Calculate commission
         base_commission = (txn_amount * charge_rate / 100) if rate_is_percent else charge_rate
-
-        # Calculate GST amount on commission (inclusive GST logic)
         gst_amount_on_commission = base_commission - (base_commission / (1 + (gst_percentage / 100)))
 
         save_api_log(
@@ -248,7 +207,6 @@ def calculate_and_apply_charges(
             sp_id=provider_id, api_category="Charge Processing"
         )
 
-        # Prepare payload for external charge calculation function
         charge_payload = {
             "service_id": service_type_id,
             "amount": float(txn_amount),
@@ -276,10 +234,6 @@ def calculate_and_apply_charges(
             {"status": "success", "payload_sent": charge_payload},
             sp_id=provider_id, api_category="Charge Processing"
         )
-
-        # Trigger actual charge deduction/credit logic
-        # charges_calculation_function(request, charge_payload)
-
         return True
 
     except Exception as error:
@@ -293,10 +247,6 @@ def calculate_and_apply_charges(
 
 
 def extract_device_information(request) -> dict:
-    """
-    Parses User-Agent string to extract device, OS, browser details.
-    Returns structured dictionary.
-    """
     user_agent_str = request.META.get("HTTP_USER_AGENT", "")
     parsed_ua = parse(user_agent_str)
 

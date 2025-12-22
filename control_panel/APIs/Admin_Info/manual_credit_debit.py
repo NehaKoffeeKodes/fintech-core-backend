@@ -66,7 +66,7 @@ class AdminWalletAdjustmentView(APIView):
                             service_type="Fetch Reversal Amount", client_override="fintech_backend_db")
 
         if not all([sp_id, admin_id, txn_ref]):
-            return Response({"status": "fail", "message": "Missing required fields"}, status=400)
+            return Response({"status": "fail", "message": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             admin = Admin.objects.get(admin_id=admin_id)
@@ -77,7 +77,7 @@ class AdminWalletAdjustmentView(APIView):
             )
 
             if str(sp_id) not in self.SERVICE_TXN_MAPPING:
-                return Response({"status": "fail", "message": "Service not supported"}, status=400)
+                return Response({"status": "fail", "message": "Service not supported"}, status=status.HTTP_400_BAD_REQUEST)
 
             app_label, model_name, ref_field, status_field, amount_field = self.SERVICE_TXN_MAPPING[str(sp_id)]
             model = apps.get_model(app_label, model_name)
@@ -86,7 +86,7 @@ class AdminWalletAdjustmentView(APIView):
             current_status = getattr(transaction, status_field)
 
             if current_status == "REVERSED":
-                return Response({"status": "fail", "message": "Already reversed"}, status=400)
+                return Response({"status": "fail", "message": "Already reversed"}, status=status.HTTP_400_BAD_REQUEST)
 
             gl_entries = GlTrn.objects.using(admin.db_name).filter(
                 service_table=transaction._meta.db_table,
@@ -131,7 +131,7 @@ class AdminWalletAdjustmentView(APIView):
         except Exception as e:
             save_api_log(request, "OwnAPI", request.data, {"status": "error", "msg": str(e)}, None,
                                 service_type="Fetch Reversal Amount", client_override="fintech_backend_db")
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def process_adjustment(self, request):
         admin_id = request.data.get('admin_id')
@@ -158,7 +158,7 @@ class AdminWalletAdjustmentView(APIView):
                 elif charge_type == 'DR':
                     new_balance = current - decimal.Decimal(amount)
                 else:
-                    return Response({"status": "fail", "message": "Invalid type"}, status=400)
+                    return Response({"status": "fail", "message": "Invalid type"}, status=status.HTTP_400_BAD_REQUEST)
 
                 setattr(user_wallet, wallet, new_balance)
                 user_wallet.save(using=admin.db_name)
@@ -192,14 +192,14 @@ class AdminWalletAdjustmentView(APIView):
             partner = ServiceProvider.objects.using(admin.db_name).get(master_id=sp_id)
 
             if str(sp_id) not in self.SERVICE_TXN_MAPPING:
-                return Response({"status": "fail", "message": "Service not supported"}, status=400)
+                return Response({"status": "fail", "message": "Service not supported"}, status=status.HTTP_400_BAD_REQUEST)
 
             app_label, model_name, ref_field, status_field, amount_field = self.SERVICE_TXN_MAPPING[str(sp_id)]
             model = apps.get_model(app_label, model_name)
 
             transaction = model.objects.using(admin.db_name).get(**{ref_field: txn_ref})
             if getattr(transaction, status_field) == "REVERSED":
-                return Response({"status": "fail", "message": "Already reversed"}, status=400)
+                return Response({"status": "fail", "message": "Already reversed"}, status=status.HTTP_400_BAD_REQUEST)
 
             setattr(transaction, status_field, 'REVERSED')
             transaction.save(using=admin.db_name)
@@ -250,4 +250,4 @@ class AdminWalletAdjustmentView(APIView):
         except Exception as e:
             save_api_log(request, "OwnAPI", request.data, {"status": "error", "msg": str(e)}, None,
                                 service_type="Wallet Adjustment", client_override="fintech_backend_db")
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

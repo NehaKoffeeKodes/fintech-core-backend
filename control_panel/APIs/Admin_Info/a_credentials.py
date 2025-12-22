@@ -68,7 +68,7 @@ class SMSSettingsView(APIView):
         try:
             sms_id = request.data.get('id')
             if not sms_id:
-                return Response({"status": "fail", "message": "ID chahiye"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"status": "fail", "message": "Enter ID"}, status=status.HTTP_400_BAD_REQUEST)
 
             cred = SMSAccount.objects.get(sms_id=sms_id)
             if request.data.get('api_key'):      cred.sms_api_key = request.data['api_key']
@@ -91,7 +91,7 @@ class SMSSettingsView(APIView):
         except SMSAccount.DoesNotExist:
             return Response({"status": "fail", "message": "SMS setting is not found"}, status=status.HTTP_404_NOT_FOUND)
         except SMSTemplate.DoesNotExist:
-            return Response({"status": "fail", "message": "Template nahi mila"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"status": "fail", "message": "Template is not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -149,7 +149,7 @@ class EmailSettingsView(APIView):
             })
 
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request):
         if 'otp' in request.data:
@@ -161,7 +161,7 @@ class EmailSettingsView(APIView):
         try:
             email_id = request.data.get('id')
             if not email_id:
-                return Response({"status": "fail", "message": "SMTP ID required"}, status=400)
+                return Response({"status": "fail", "message": "SMTP ID required"}, status=status.HTTP_400_BAD_REQUEST)
 
             try:
                 email_setting = SmtpEmail.objects.get(id=email_id)
@@ -219,12 +219,12 @@ class EmailSettingsView(APIView):
                 if response.status_code == 200:
                     return Response({"status": "success", "message": "OTP successfully sent!"})
                 else:
-                    return Response({"status": "fail", "message": f"Email service error: {response.text}"}, status=500)
+                    return Response({"status": "fail", "message": f"Email service error: {response.text}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             except SmtpEmail.DoesNotExist:
-                return Response({"status": "fail", "message": "Email setting not found"}, status=404)
+                return Response({"status": "fail", "message": "Email setting not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def check_otp_and_save(self, request):
         try:
@@ -233,9 +233,9 @@ class EmailSettingsView(APIView):
             setting = SmtpEmail.objects.get(id=email_id)
 
             if setting.verify_otp != entered_otp:
-                return Response({"status": "fail", "message": "Invalid OTP"}, status=400)
+                return Response({"status": "fail", "message": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
             if setting.otp_expires_at < timezone.now():
-                return Response({"status": "fail", "message": "OTP expired"}, status=400)
+                return Response({"status": "fail", "message": "OTP expired"}, status=status.HTTP_400_BAD_REQUEST)
 
             if 'host' in request.data: setting.smtp_server = request.data['host']
             if 'port' in request.data: setting.smtp_port = request.data['port']
@@ -247,6 +247,6 @@ class EmailSettingsView(APIView):
             return Response({"status": "success", "message": "Email saved successfully!"})
 
         except SmtpEmail.DoesNotExist:
-            return Response({"status": "fail", "message": "Email not found"}, status=404)
+            return Response({"status": "fail", "message": "Email not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=500)
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

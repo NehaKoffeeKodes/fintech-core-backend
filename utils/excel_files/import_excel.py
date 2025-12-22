@@ -1,5 +1,4 @@
 import openpyxl
-
 from admin_hub.models import GlobalBankInstitution
 
 def process_bank_import_from_excel(uploaded_file):
@@ -28,14 +27,11 @@ def process_bank_import_from_excel(uploaded_file):
     imported_count = 0
     for row in sheet.iter_rows(min_row=2, values_only=True):
         row_dict = dict(zip(mapped_fields, row))
-
-        # Skip if updating existing (institution_id present)
         if row_dict.get('institution_id'):
             continue
 
         row_dict.pop('institution_id', None)
 
-        # Convert TRUE/FALSE strings to boolean
         for bool_key in ['supports_payout', 'supports_funding', 'is_inactive']:
             value = row_dict.get(bool_key)
             if isinstance(value, str):
@@ -44,7 +40,6 @@ def process_bank_import_from_excel(uploaded_file):
             elif value is None:
                 row_dict[bool_key] = False
 
-        # Save new institution
         GlobalBankInstitution.objects.create(**row_dict)
         imported_count += 1
 

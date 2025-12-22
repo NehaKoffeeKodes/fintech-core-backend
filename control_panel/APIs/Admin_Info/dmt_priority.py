@@ -117,4 +117,4 @@ class DmtPriorityView(APIView):
                 "success": False,
                 "message": "Update failed",
                 "detail": str(e)
-            }, status=500)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

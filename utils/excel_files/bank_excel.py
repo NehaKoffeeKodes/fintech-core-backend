@@ -4,9 +4,6 @@ from django.conf import settings
 from datetime import datetime
 
 def create_template_excel(column_titles):
-    """
-    Creates a blank Excel template with given headers.
-    """
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Bank_Template"

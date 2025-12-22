@@ -148,7 +148,7 @@ class GadgetPurchaseAPIView(APIView):
             }, status=200)
 
         except Exception as e:
-            return Response({'status': 'error', 'message': str(e)}, status=500)
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request):
         try:

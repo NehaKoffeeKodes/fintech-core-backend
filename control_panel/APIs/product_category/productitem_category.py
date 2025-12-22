@@ -33,7 +33,7 @@ class CategoryManagementView(APIView):
 
                 AdminActivityLog.objects.create(
                     user=request.user,
-                    action='create',   # or update / delete
+                    action='create',  
                     description='New category added successfully',
                     ip_address=request.META.get('REMOTE_ADDR'),
                     user_agent=request.META.get('HTTP_USER_AGENT'),

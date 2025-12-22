@@ -42,7 +42,7 @@ def get_instantpay_headers():
         "X-Ipay-Outlet-Id": os.getenv("INSTANTPAY_OUTLET_ID"),
     }
 
-# ----------------- GatewayBalanceView -----------------
+
 
 class GatewayBalanceView(APIView):
     permission_classes = [IsAuthenticated]

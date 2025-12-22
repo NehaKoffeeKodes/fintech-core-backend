@@ -39,7 +39,7 @@ class ManageDocumentTemplatesView(APIView):
                     return Response({
                         "success": False,
                         "message": "Validation failed",
-                        "errors": serializer.errors  # ← This is the key!
+                        "errors": serializer.errors 
                     }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:

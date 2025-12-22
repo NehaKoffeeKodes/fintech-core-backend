@@ -1,4 +1,3 @@
-from web_portal.APIs.latestnews_update.news_hub import ALLOWED_DOMAIN
 from ...views import*
 
 class ServiceManagementView(APIView):

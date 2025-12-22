@@ -36,7 +36,6 @@ def create_jwt_token(user, access_token_lifetime_minutes=None, db_name=None):
     refresh_token["user_id"] = user.pk
     refresh_token["full_name"] = getattr(user, 'full_name', '')
 
-    # ADD THIS: Include db_name in payload
     if db_name:
         refresh_token["db_name"] = db_name
 
