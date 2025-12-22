@@ -256,7 +256,7 @@ class Migration(migrations.Migration):
                 ('payout_result', models.CharField(default='PROCESSING', max_length=30)),
                 ('batch_result', models.CharField(default='PROCESSING', max_length=30)),
                 ('payout_mode', models.CharField(blank=True, max_length=15)),
-                ('vendor_response', models.JSONField(blank=True, default=dict)),
+                ('admin_response', models.JSONField(blank=True, default=dict)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
             ],
             options={

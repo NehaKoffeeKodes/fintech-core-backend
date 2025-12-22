@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='airtelbillentry',
-            name='vendor',
+            name='admin',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='admin_hub.adserviceprovider'),
         ),
         migrations.AddField(
@@ -61,7 +61,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='bulkpayoutrecord',
-            name='vendor',
+            name='admin',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='admin_hub.adserviceprovider'),
         ),
         migrations.AddField(
@@ -180,7 +180,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='khatatransferentry',
-            name='vendor',
+            name='admin',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='admin_hub.adserviceprovider'),
         ),
         migrations.AddField(
@@ -190,7 +190,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='microatmentry',
-            name='vendor',
+            name='admin',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='admin_hub.adserviceprovider'),
         ),
         migrations.AddField(

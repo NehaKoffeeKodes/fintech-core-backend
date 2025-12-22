@@ -202,7 +202,7 @@ class GatewayBalanceView(APIView):
             url = "https://service.noblewebstudio.in/api/v1.0/airtel_dmt/partner_balance"
             headers = {
                 'Authorization': f'Bearer {token}',
-                'X-Timestamp': datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00"),  # fixed
+                'X-Timestamp': datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00"), 
                 'Content-Type': 'application/json'
             }
 

@@ -25,15 +25,15 @@ class DashboardSummaryView(APIView):
         '9':   (GasBillEntry, 'partner'),
         '10':  (LicPremiumEntry, 'partner'),
         '80':  (AepsCashLog, 'partner'),
-        '84':  (BulkPayoutRecord, 'vendor'),
-        '85':  (AirtelBillEntry, 'vendor'),
+        '84':  (BulkPayoutRecord, 'admin'),
+        '85':  (AirtelBillEntry, 'admin'),
         '86':  (BankItAepsRecord, 'partner'),
-        '92':  (MicroAtmEntry, 'vendor'),
+        '92':  (MicroAtmEntry, 'admin'),
         '95':  (FundTransferEntry, 'partner'),
         '97':  (BankItAepsRecord, 'partner'),
-        '103': (MicroAtmEntry, 'vendor'),
+        '103': (MicroAtmEntry, 'admin'),
         '106': (PpiTransferLog, 'partner'),
-        '109': (KhataTransferEntry, 'vendor'),
+        '109': (KhataTransferEntry, 'admin'),
     }
 
     def post(self, request):

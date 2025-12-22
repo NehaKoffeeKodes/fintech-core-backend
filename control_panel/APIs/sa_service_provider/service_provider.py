@@ -16,12 +16,14 @@ def get_tag_data_safely(entry, use_tag_mode=False):
             return None
     return None
 
+
 class ProviderManagementView(APIView):
     permission_classes = [IsAuthenticated]
+
     def post(self, request):
         try:
             if 'page_number' in request.data:
-                return self.list_vendors(request)
+                return self.list_admins(request)
             else:
                 return Response({
                     'status': 'fail',
@@ -35,10 +37,10 @@ class ProviderManagementView(APIView):
 
     def put(self, request):
         try:
-            if 'vendor_id' in request.data and 'fees_to_customer' in request.data:
-                return self.update_vendor_fees(request)
-            elif 'vendor_id' in request.data:
-                return self.toggle_vendor_status(request)
+            if 'admin_id' in request.data and 'fees_to_customer' in request.data:
+                return self.update_admin_fees(request)
+            elif 'admin_id' in request.data:
+                return self.toggle_admin_status(request)
             else:
                 return Response({
                     'status': 'fail',
@@ -50,89 +52,93 @@ class ProviderManagementView(APIView):
                 'message': f'Server error: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def list_vendors(self, request):
+    def list_admins(self, request):
         try:
             page = int(request.data.get('page_number', 1))
             size = int(request.data.get('page_size', 20))
-            vendor_id = request.data.get('vendor_id')
+            admin_id = request.data.get('admin_id')
             service_id = request.data.get('service_id')
             tax_id = request.data.get('tax_id')
             search = request.data.get('search')
 
             if page < 1 or size < 1:
-                return Response({'status': 'fail', 'message': 'Invalid pagination values'}, 
+                return Response({'status': 'fail', 'message': 'Invalid pagination values'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            query = ServiceProvider.objects.filter(parent__isnull=True, is_removed=False).order_by('-id')
+            # No parent field → just filter active providers
+            query = ServiceProvider.objects.filter(is_removed=False).order_by('-sp_id')
 
-            if vendor_id and vendor_id.isdigit():
-                query = query.filter(id=vendor_id)
+            if admin_id and admin_id.isdigit():
+                query = query.filter(sp_id=admin_id)
             if service_id and service_id.isdigit():
                 query = query.filter(service_id=service_id)
             if tax_id and tax_id.isdigit():
-                query = query.filter(tax_code_id=tax_id)
+                query = query.filter(hsn_code_id=tax_id)
             if search:
                 query = query.filter(
-                    Q(service__name__icontains=search) |
-                    Q(name__icontains=search) |
-                    Q(display_name__icontains=search) |
-                    Q(tax_code__code__icontains=search)
+                    Q(service__title__icontains=search) |       # pehle wala fix (title, name nahi)
+                    Q(display_label__icontains=search) |
+                    Q(admin_code__icontains=search) |
+                    Q(hsn_code__gst_code__icontains=search)     # ← code → gst_code
                 )
 
             paginator = Paginator(query, size)
             try:
                 current_page = paginator.page(page)
             except EmptyPage:
-                return Response({'status': 'fail', 'message': 'Page not found'}, 
+                return Response({'status': 'fail', 'message': 'Page not found'},
                                 status=status.HTTP_404_NOT_FOUND)
 
             results = []
-            for vendor in current_page:
-                tag_mode = vendor.uses_tag_based_fees
+            for admin in current_page:
+                # Assuming you have a way to determine tag mode — adjust if needed
+                tag_mode = getattr(admin, 'uses_tag_based_fees', False)
 
                 if tag_mode:
-                    related = ServiceIdentifier.objects.filter(provider__id=vendor.id, is_removed=False)
+                    related = ServiceIdentifier.objects.filter(provider=admin, is_removed=False)
                 else:
-                    related = ServiceProvider.objects.filter(parent=vendor)
+                    related = ServiceIdentifier.objects.none()
 
-                fees_qs = ChargeRule.objects.filter(vendor=vendor).order_by('min_amount')
-                fee_type = fees_qs.first().fee_type if fees_qs.exists() else None
+                # FIXED: admin → service_provider
+                fees_qs = ChargeRule.objects.filter(service_provider=admin, is_deleted=False).order_by('min_amount')
+
+                fee_type = fees_qs.first().rate_mode if fees_qs.exists() else None  # FLAT or PERCENT
                 serializer = ChargeRuleSerializer(fees_qs, many=True)
                 fee_data = serializer.data
 
                 for item in fee_data:
                     item.pop('created_at', None)
-                    item.pop('modified_at', None)
-                    item.pop('is_inactive', None)
-                    item.pop('is_removed', None)
-                    item['is_range_based'] = not (item['min_amount'] == "0.00" and item['max_amount'] == "0.00")
+                    item.pop('updated_at', None)
+                    item.pop('is_disabled', None)
+                    item.pop('is_deleted', None)
+                    item['is_range_based'] = not (item['min_amount'] in ["0.00", None] and item['max_amount'] in ["0.00", None])
 
                 if tag_mode:
-                    active_tags = related.filter(is_inactive=False).count()
+                    active_tags = related.filter(is_disabled=False).count()  # assuming is_disabled instead of is_inactive
                     total_tags = related.count()
-                    fees_exist_status = ("True" if active_tags == total_tags else 
+                    fees_exist_status = ("True" if active_tags == total_tags else
                                         "Partially True" if active_tags > 0 else "False")
                 else:
-                    fees_exist_status = "True" if not vendor.is_inactive else "False"
+                    fees_exist_status = "True" if not admin.is_inactive else "False"
 
                 results.append({
-                    'vendor_id': vendor.id,
-                    'service_id': vendor.service.id,
-                    'service_name': vendor.service.name,
-                    'name': vendor.name,
-                    'display_name': vendor.display_name,
-                    'tax_code_id': vendor.tax_code.id if vendor.tax_code else None,
-                    'tax_code': vendor.tax_code.code if vendor.tax_code else None,
-                    'tax_percent': vendor.tax_code.percent if vendor.tax_code else None,
+                    'admin_id': admin.sp_id,
+                    'service_id': admin.service.service_key,   # ← Fixed: service_key, not id
+                    'service_name': admin.service.title,       # ← Fixed: title, not name
+                    'name': admin.admin_code,
+                    'display_name': admin.display_label,
+                    'tax_code_id': admin.hsn_code.service_key if admin.hsn_code else None,  # if GSTCode also uses custom PK
+                    'tax_code': admin.hsn_code.code if admin.hsn_code else None,
+                    'tax_percent': admin.hsn_code.percent if admin.hsn_code else None,
                     'fee_type': fee_type,
-                    'is_active': not vendor.is_inactive,
+                    'is_active': not admin.is_inactive,
                     'fee_list': fee_data,
-                    'config_data': vendor.config_json,
-                    'platform_charge': vendor.platform_charge,
-                    'platform_charge_type': vendor.platform_charge_type,
-                    'required_fields': vendor.required_fields,
+                    'config_data': admin.api_credentials,
+                    'platform_charge': admin.platform_charge,
+                    'platform_charge_type': admin.charge_type,
+                    'required_fields': admin.required_params,
                     'fees_configured': fees_exist_status,
-                    'tag_data': get_tag_data_safely(vendor, tag_mode)
+                    'tag_data': get_tag_data_safely(admin, tag_mode)
                 })
 
             response_data = {
@@ -144,7 +150,7 @@ class ProviderManagementView(APIView):
 
             return Response({
                 'status': 'success',
-                'message': 'Vendors fetched successfully',
+                'message': 'admins fetched successfully',
                 'data': response_data
             }, status=status.HTTP_200_OK)
 
@@ -154,79 +160,84 @@ class ProviderManagementView(APIView):
                 'message': f'Error: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def toggle_vendor_status(self, request):
+    def toggle_admin_status(self, request):
         try:
-            vendor_id = request.data.get('vendor_id')
+            admin_id = request.data.get('admin_id')
             tag_id = request.data.get('tag_id')
 
-            vendor = ServiceProvider.objects.filter(id=vendor_id).first()
-            if not vendor:
-                return Response({'status': 'fail', 'message': 'Vendor not found'}, 
+            admin = ServiceProvider.objects.filter(sp_id=admin_id).first()
+            if not admin:
+                return Response({'status': 'fail', 'message': 'admin not found'},
                                 status=status.HTTP_404_NOT_FOUND)
 
             if tag_id:
-                tag = ServiceIdentifier.objects.filter(tag_id=tag_id, provider=vendor).first()
+                tag = ServiceIdentifier.objects.filter(tag_id=tag_id, provider=admin).first()
                 if not tag:
-                    return Response({'status': 'fail', 'message': 'Tag not found'}, 
+                    return Response({'status': 'fail', 'message': 'Tag not found'},
                                     status=status.HTTP_404_NOT_FOUND)
 
-                has_fees = ChargeRule.objects.filter(vendor=vendor, tag_id=tag_id).exists()
-                if tag.is_inactive and not has_fees:
-                    return Response({'status': 'fail', 'message': 'Cannot activate without fee setup'}, 
+                # FIXED: admin → service_provider
+                has_fees = ChargeRule.objects.filter(service_provider=admin, linked_identifier=tag_id, is_deleted=False).exists()
+                if tag.is_disabled and not has_fees:  # assuming is_disabled
+                    return Response({'status': 'fail', 'message': 'Cannot activate without fee setup'},
                                     status=status.HTTP_400_BAD_REQUEST)
 
-                tag.is_inactive = not tag.is_inactive
+                tag.is_disabled = not tag.is_disabled
                 tag.save()
-                msg = 'Tag activated' if not tag.is_inactive else 'Tag deactivated'
+                msg = 'Tag activated' if not tag.is_disabled else 'Tag deactivated'
                 return Response({'status': 'success', 'message': msg}, status=status.HTTP_200_OK)
 
-            if vendor.is_inactive:
-                if not ChargeRule.objects.filter(vendor=vendor).exists():
-                    return Response({'status': 'fail', 'message': 'Setup fees before activating'}, 
+            # Main admin toggle
+            if admin.is_inactive:
+                # FIXED: admin → service_provider
+                if not ChargeRule.objects.filter(service_provider=admin, is_deleted=False).exists():
+                    return Response({'status': 'fail', 'message': 'Setup fees before activating'},
                                     status=status.HTTP_400_BAD_REQUEST)
-                vendor.is_inactive = False
-                msg = 'Vendor activated successfully'
+                admin.is_inactive = False
+                msg = 'admin activated successfully'
             else:
-                vendor.is_inactive = True
-                msg = 'Vendor deactivated successfully'
+                admin.is_inactive = True
+                msg = 'admin deactivated successfully'
 
-            vendor.save()
+            admin.save()
             return Response({'status': 'success', 'message': msg}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({'status': 'error', 'message': str(e)}, 
+            return Response({'status': 'error', 'message': str(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @transaction.atomic
-    def update_vendor_fees(self, request):
+    def update_admin_fees(self, request):
         try:
-            vendor_id = request.data.get('vendor_id')
+            admin_id = request.data.get('admin_id')
             tag_id = request.data.get('tag_id')
-            fee_type = request.data.get('fee_type')
+            fee_type = request.data.get('fee_type')  # 'FLAT' or 'PERCENT'
             tax_id = request.data.get('tax_id')
             display_name = request.data.get('display_name')
 
-            if not vendor_id:
-                return Response({'status': 'fail', 'message': 'vendor_id required'}, 
+            if not admin_id:
+                return Response({'status': 'fail', 'message': 'admin_id required'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            vendor = ServiceProvider.objects.get(id=vendor_id)
+            admin = ServiceProvider.objects.get(sp_id=admin_id)
 
             if not tag_id:
                 if not tax_id:
-                    return Response({'status': 'fail', 'message': 'tax_id required'}, 
+                    return Response({'status': 'fail', 'message': 'tax_id required'},
                                     status=status.HTTP_400_BAD_REQUEST)
-                vendor.tax_code = GSTCode.objects.get(id=tax_id)
-                vendor.display_name = display_name
-                vendor.modified_at = timezone.now()
-                vendor.modified_by = request.user
-                vendor.save()
+                admin.hsn_code = GSTCode.objects.get(id=tax_id)
+                if display_name:
+                    admin.display_label = display_name
+                admin.last_updated = timezone.now()
+                admin.updated_by = request.user
+                admin.save()
 
             customer_fees_json = request.data.get('fees_to_customer', '[]')
             provider_fees_json = request.data.get('fees_to_provider', '[]')
 
-            self.sync_fees(customer_fees_json, vendor, request, 'customer', fee_type, tag_id)
-            self.sync_fees(provider_fees_json, vendor, request, 'provider', fee_type, tag_id)
+            # Pass fee_type as rate_mode (FLAT/PERCENT)
+            self.sync_fees(customer_fees_json, admin, request, 'OUR_SHARE', fee_type, tag_id)       # customer → OUR_SHARE ?
+            self.sync_fees(provider_fees_json, admin, request, 'admin_SHARE', fee_type, tag_id)     # provider → admin_SHARE ?
 
             return Response({
                 'status': 'success',
@@ -234,28 +245,30 @@ class ProviderManagementView(APIView):
             }, status=status.HTTP_200_OK)
 
         except ServiceProvider.DoesNotExist:
-            return Response({'status': 'fail', 'message': 'Vendor not found'}, 
+            return Response({'status': 'fail', 'message': 'admin not found'},
                             status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({'status': 'error', 'message': str(e)}, 
+            return Response({'status': 'error', 'message': str(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def sync_fees(self, fees_json_str, vendor, request, category, fee_type, tag_id=None):
+    def sync_fees(self, fees_json_str, admin, request, category, rate_mode, tag_id=None):
         try:
             fees_list = json.loads(fees_json_str)
         except json.JSONDecodeError:
             raise ValueError("Invalid fee data format")
 
+        # FIXED: admin → service_provider
         existing = ChargeRule.objects.filter(
-            vendor=vendor,
-            category=category,
-            is_removed=False
+            service_provider=admin,
+            charge_beneficiary=category,
+            is_deleted=False
         )
         if tag_id:
-            existing = existing.filter(tag_id=tag_id)
+            existing = existing.filter(linked_identifier=tag_id)
 
+        # Key based on unique logic
         existing_map = {
-            (f.min_amount, f.max_amount, f.rate_kind, f.fee_type): f
+            (f.min_amount or Decimal('0'), f.max_amount or Decimal('0'), f.rate_mode, f.charge_type): f
             for f in existing
         }
 
@@ -267,38 +280,41 @@ class ProviderManagementView(APIView):
                 raise ValueError("Missing required fee fields")
 
             try:
-                min_val = Decimal(item['min_amount'])
-                max_val = Decimal(item['max_amount'])
-                rate_val = Decimal(item['rate'])
+                min_val = Decimal(str(item['min_amount'])) if item['min_amount'] not in ['', None] else Decimal('0')
+                max_val = Decimal(str(item['max_amount'])) if item['max_amount'] not in ['', None] else Decimal('0')
+                rate_val = Decimal(str(item['rate']))
             except (InvalidOperation, ValueError):
                 raise ValueError("Invalid number in fees")
 
-            key = (min_val, max_val, item['rate_kind'], fee_type)
+            # rate_kind → FLAT/PERCENT → maps to rate_mode
+            resolved_rate_mode = item['rate_kind'].upper()  # 'flat' → 'FLAT'
+
+            key = (min_val, max_val, resolved_rate_mode, 'DEBIT')  # assuming charge_type is fixed or dynamic
             incoming_keys.add(key)
 
             existing_fee = existing_map.get(key)
-            if existing_fee and existing_fee.rate != rate_val:
-                existing_fee.rate = rate_val
-                existing_fee.modified_at = timezone.now()
-                existing_fee.modified_by = request.user
+            if existing_fee and existing_fee.rate_value != rate_val:
+                existing_fee.rate_value = rate_val
+                existing_fee.updated_at = timezone.now()
+                existing_fee.updated_by = request.user
                 existing_fee.save()
             elif not existing_fee:
-                data = {
-                    'min_amount': min_val,
-                    'max_amount': max_val,
-                    'rate': rate_val,
-                    'rate_kind': item['rate_kind'],
-                    'fee_type': fee_type,
-                    'category': category,
-                    'vendor': vendor,
-                }
-                if tag_id:
-                    data['tag_id'] = tag_id
-                ChargeRule.objects.create(**data)
+                ChargeRule.objects.create(
+                    service_provider=admin,
+                    charge_type='DEBIT',  # or make dynamic
+                    rate_mode=resolved_rate_mode,
+                    min_amount=min_val if min_val != Decimal('0') else None,
+                    max_amount=max_val if max_val != Decimal('0') else None,
+                    rate_value=rate_val,
+                    linked_identifier=tag_id,
+                    charge_beneficiary=category,
+                    updated_by=request.user
+                )
 
+        # Soft delete removed ones
         for key, fee in existing_map.items():
             if key not in incoming_keys:
-                fee.is_removed = True
-                fee.modified_at = timezone.now()
-                fee.modified_by = request.user
+                fee.is_deleted = True
+                fee.updated_at = timezone.now()
+                fee.updated_by = request.user
                 fee.save()

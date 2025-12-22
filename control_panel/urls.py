@@ -147,9 +147,6 @@ urlpatterns = [
     #service_balance
     path('gateway-balance/',GatewayBalanceView.as_view()),
     
-    #CREDENTIALS
-    path('credential-settings/',CredentialSettingsView.as_view()),
-    
     #views
     path('create-order',CreateOrderManager.as_view()),
     path('auth/',AuthView.as_view()),
@@ -159,6 +156,7 @@ urlpatterns = [
     
     #service_provider
     path('provider-management/',ProviderManagementView.as_view()),
+    path('credential-settings/',CredentialSettingsView.as_view()),
     
     
     

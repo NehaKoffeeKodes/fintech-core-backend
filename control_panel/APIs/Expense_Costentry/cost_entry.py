@@ -95,7 +95,7 @@ class CostManagementView(APIView):
                     Q(payment_method__icontains=search) |
                     Q(tax_status__icontains=search) |
                     Q(notes__icontains=search) |
-                    Q(vendor_name__icontains=search)
+                    Q(admin_name__icontains=search)
                 )
 
             if not qs.exists():
