@@ -36,13 +36,13 @@ class SmtpEmail(models.Model):
     sender_email = models.EmailField()
     sender_password = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
+    verify_otp = models.CharField(max_length=6, null=True, blank=True)
+    otp_expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "superadmin_smtp_mail"
         verbose_name = "SMTP Configuration"
 
-    def __str__(self):
-        return f"{self.service_type} - {self.sender_email}"
     
 
 

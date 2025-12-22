@@ -160,8 +160,6 @@ SIMPLE_JWT = {
     'ISSUER': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    # 'USER_ID_FIELD': 'member_id',
-    # 'USER_ID_CLAIM': 'member_id',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
@@ -178,25 +176,3 @@ EMAIL_HOST_USER = "cs2147.assc@gmail.com"
 EMAIL_HOST_PASSWORD = "yhic umiw fwle yofa"   
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER   
 
-# settings.py mein yeh add kar do
-
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-    'loggers': {
-        'your_app_name.views': {  # ya phir sirf __name__ wala kaam karega
-            'level': 'INFO',
-            'handlers': ['console'],
-            'propagate': False,
-        },
-    },
-}

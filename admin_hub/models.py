@@ -512,7 +512,6 @@ class UserLoginSession(models.Model):
     last_active_at = models.DateTimeField(default=timezone.now)
     platform = models.CharField(max_length=50, choices=[('ANDROID', 'Android'), ('IOS', 'iOS'), ('WEB', 'Web')])
     ip_location = models.JSONField(null=True, blank=True)
-
     created_on = models.DateTimeField(auto_now_add=True)
 
     class Meta:

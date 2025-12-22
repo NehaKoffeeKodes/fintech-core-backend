@@ -30,15 +30,16 @@ class SMSSettingsView(APIView):
 
                 final_list.append({
                     "id": cred.sms_id,
-                    "api_key": cred.sms_api_key,
-                    "sender_id": cred.sms_sender_id,
-                    "type": cred.action_type,
+                    "api_key": cred.api_key,
+                    "sender_id": cred.sender,
+                    "type": cred.action,
                     "action_id": cred.action_id,
-                    "pe_id": cred.sms_pe_id,
+                    "pe_id": cred.pe_id,
                     "template_id": template.mt_te_id if template else "",
                     "message_body": template.message if template else "",
                     "added_on": cred.created_at.strftime("%d %b %Y, %I:%M %p")
                 })
+
 
             total = len(final_list)
             total_pages = math.ceil(total / size)
@@ -84,15 +85,18 @@ class SMSSettingsView(APIView):
 
             return Response({
                 "status": "success",
-                "message": "SMS settings update ho gaye!"
+                "message": "SMS settings updated successfully"
             })
 
         except SMSAccount.DoesNotExist:
-            return Response({"status": "fail", "message": "SMS setting nahi mili"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"status": "fail", "message": "SMS setting is not found"}, status=status.HTTP_404_NOT_FOUND)
         except SMSTemplate.DoesNotExist:
             return Response({"status": "fail", "message": "Template nahi mila"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
 
 
 
@@ -106,12 +110,12 @@ class EmailSettingsView(APIView):
             size = int(request.data.get('page_size', 10))
             search = request.data.get('search', '')
 
-            emails = SmtpEmail.objects.filter(action_type='SUPERADMIN').order_by('-smtp_id')
+            emails = SmtpEmail.objects.filter(service_type='SUPERADMIN').order_by('-id')
 
             if search:
                 emails = emails.filter(
-                    Q(smtp_host__icontains=search) |
-                    Q(smtp_host_user__icontains=search)
+                    Q(smtp_server__icontains=search) |
+                    Q(sender_email__icontains=search)
                 )
 
             total = emails.count()
@@ -122,20 +126,20 @@ class EmailSettingsView(APIView):
             result = []
             for e in paginated:
                 result.append({
-                    "id": e.smtp_id,
-                    "host": e.smtp_host,
+                    "id": e.id,
+                    "host": e.smtp_server,
                     "port": e.smtp_port,
-                    "username": e.smtp_host_user,
-                    "password": "******", 
-                    "encryption": e.encryption_type,
-                    "from_email": e.from_email,
-                    "type": e.action_type,
-                    "added_on": e.created_at.strftime("%d %b %Y")
+                    "username": e.sender_email,
+                    "password": "******",
+                    "encryption": e.encryption,
+                    "from_email": e.sender_email,
+                    "type": e.service_type,
+                    "added_on": e.id
                 })
 
             return Response({
                 "status": "success",
-                "message": "Email settings is found successfully!",
+                "message": "Email settings found successfully!",
                 "data": {
                     "total": total,
                     "pages": total_pages,
@@ -145,7 +149,7 @@ class EmailSettingsView(APIView):
             })
 
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"status": "error", "message": str(e)}, status=500)
 
     def put(self, request):
         if 'otp' in request.data:
@@ -155,12 +159,12 @@ class EmailSettingsView(APIView):
 
     def send_test_otp(self, request):
         try:
-            smtp_id = request.data.get('id')
-            if not smtp_id:
-                return Response({"status": "fail", "message": "SMTP ID required"}, status=status.HTTP_400_BAD_REQUEST)
+            email_id = request.data.get('id')
+            if not email_id:
+                return Response({"status": "fail", "message": "SMTP ID required"}, status=400)
 
             try:
-                email_setting = SmtpEmail.objects.get(smtp_id=smtp_id)
+                email_setting = SmtpEmail.objects.get(id=email_id)
             except SmtpEmail.DoesNotExist:
                 return Response({"status": "fail", "message": "Email setting not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -195,88 +199,54 @@ class EmailSettingsView(APIView):
             </body>
             </html>
             """
-
             text_msg = strip_tags(html_msg)
-            internal_api_url = "http://127.0.0.1:8000/api/send-otp-email/" 
+            internal_api_url = "http://127.0.0.1:8000/control-panel/api/send-otp-email/"
 
             payload = {
-                "email": request.data.get('from_email') or email_setting.from_email,
+                "email": request.data.get('from_email') or email_setting.sender_email,
                 "subject": "Verify Your Email Settings - OTP",
                 "html": html_msg,
                 "text": text_msg,
-                "host": request.data.get('host') or email_setting.smtp_host,
+                "host": request.data.get('host') or email_setting.smtp_server,
                 "port": request.data.get('port') or email_setting.smtp_port,
-                "SMTP_USER": request.data.get('username') or email_setting.smtp_host_user,
-                "SMTP_PASS": request.data.get('password') or email_setting.smtp_host_password,
-                "from_email": request.data.get('from_email') or email_setting.from_email,
+                "SMTP_USER": request.data.get('username') or email_setting.sender_email,
+                "SMTP_PASS": request.data.get('password') or email_setting.sender_password,
+                "from_email": request.data.get('from_email') or email_setting.sender_email,
             }
 
             try:
-                response = requests.post(
-                    internal_api_url,
-                    json=payload,
-                    timeout=15  
-                )
-
+                response = requests.post(internal_api_url, json=payload, timeout=15)
                 if response.status_code == 200:
-                    return Response({
-                        "status": "success",
-                        "message": "OTP successfully sent to email!"
-                    })
+                    return Response({"status": "success", "message": "OTP successfully sent!"})
                 else:
-                    return Response({
-                        "status": "fail",
-                        "message": f"Email service error: {response.text}"
-                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response({"status": "fail", "message": f"Email service error: {response.text}"}, status=500)
 
-            except requests.exceptions.Timeout:
-                return Response({
-                    "status": "error",
-                    "message": "Email service timeout. Please try again."
-                }, status=504)
-            except requests.exceptions.ConnectionError:
-                return Response({
-                    "status": "error",
-                    "message": "Cannot connect to email service. Check server."
-                }, status=503)
-            except Exception as e:
-                return Response({
-                    "status": "error",
-                    "message": f"Failed to send OTP: {str(e)}"
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            except SmtpEmail.DoesNotExist:
+                return Response({"status": "fail", "message": "Email setting not found"}, status=404)
         except Exception as e:
-            return Response({
-                "status": "error",
-                "message": f"Server error: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"status": "error", "message": str(e)}, status=500)
 
     def check_otp_and_save(self, request):
         try:
-            smtp_id = request.data.get('id')
+            email_id = request.data.get('id')
             entered_otp = request.data.get('otp')
-            setting = SmtpEmail.objects.get(smtp_id=smtp_id)
+            setting = SmtpEmail.objects.get(id=email_id)
 
             if setting.verify_otp != entered_otp:
-                return Response({"status": "fail", "message": "invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
-
+                return Response({"status": "fail", "message": "Invalid OTP"}, status=400)
             if setting.otp_expires_at < timezone.now():
-                return Response({"status": "fail", "message": "OTP expired"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"status": "fail", "message": "OTP expired"}, status=400)
 
-            if request.data.get('host'):         setting.smtp_host = request.data['host']
-            if request.data.get('port'):         setting.smtp_port = request.data['port']
-            if request.data.get('username'):     setting.smtp_host_user = request.data['username']
-            if request.data.get('password'):     setting.smtp_host_password = request.data['password']
-            if request.data.get('encryption'):   setting.encryption_type = request.data['encryption']
-            if request.data.get('from_email'):   setting.from_email = request.data['from_email']
+            if 'host' in request.data: setting.smtp_server = request.data['host']
+            if 'port' in request.data: setting.smtp_port = request.data['port']
+            if 'username' in request.data: setting.sender_email = request.data['username']
+            if 'password' in request.data: setting.sender_password = request.data['password']
+            if 'encryption' in request.data: setting.encryption = request.data['encryption']
             setting.save()
 
-            return Response({
-                "status": "success",
-                "message": "Email save successfully!"
-            })
+            return Response({"status": "success", "message": "Email saved successfully!"})
 
         except SmtpEmail.DoesNotExist:
-            return Response({"status": "fail", "message": "email not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"status": "fail", "message": "Email not found"}, status=404)
         except Exception as e:
-            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"status": "error", "message": str(e)}, status=500)

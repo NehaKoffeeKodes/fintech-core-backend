@@ -65,7 +65,6 @@ class ProviderManagementView(APIView):
                 return Response({'status': 'fail', 'message': 'Invalid pagination values'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            # No parent field → just filter active providers
             query = ServiceProvider.objects.filter(is_removed=False).order_by('-sp_id')
 
             if admin_id and admin_id.isdigit():
@@ -76,10 +75,10 @@ class ProviderManagementView(APIView):
                 query = query.filter(hsn_code_id=tax_id)
             if search:
                 query = query.filter(
-                    Q(service__title__icontains=search) |       # pehle wala fix (title, name nahi)
+                    Q(service__title__icontains=search) |     
                     Q(display_label__icontains=search) |
                     Q(admin_code__icontains=search) |
-                    Q(hsn_code__gst_code__icontains=search)     # ← code → gst_code
+                    Q(hsn_code__gst_code__icontains=search)    
                 )
 
             paginator = Paginator(query, size)
@@ -91,18 +90,15 @@ class ProviderManagementView(APIView):
 
             results = []
             for admin in current_page:
-                # Assuming you have a way to determine tag mode — adjust if needed
                 tag_mode = getattr(admin, 'uses_tag_based_fees', False)
 
                 if tag_mode:
                     related = ServiceIdentifier.objects.filter(provider=admin, is_removed=False)
                 else:
                     related = ServiceIdentifier.objects.none()
-
-                # FIXED: admin → service_provider
+                    
                 fees_qs = ChargeRule.objects.filter(service_provider=admin, is_deleted=False).order_by('min_amount')
-
-                fee_type = fees_qs.first().rate_mode if fees_qs.exists() else None  # FLAT or PERCENT
+                fee_type = fees_qs.first().rate_mode if fees_qs.exists() else None  
                 serializer = ChargeRuleSerializer(fees_qs, many=True)
                 fee_data = serializer.data
 
@@ -114,7 +110,7 @@ class ProviderManagementView(APIView):
                     item['is_range_based'] = not (item['min_amount'] in ["0.00", None] and item['max_amount'] in ["0.00", None])
 
                 if tag_mode:
-                    active_tags = related.filter(is_disabled=False).count()  # assuming is_disabled instead of is_inactive
+                    active_tags = related.filter(is_disabled=False).count()  
                     total_tags = related.count()
                     fees_exist_status = ("True" if active_tags == total_tags else
                                         "Partially True" if active_tags > 0 else "False")
@@ -123,11 +119,11 @@ class ProviderManagementView(APIView):
 
                 results.append({
                     'admin_id': admin.sp_id,
-                    'service_id': admin.service.service_key,   # ← Fixed: service_key, not id
-                    'service_name': admin.service.title,       # ← Fixed: title, not name
+                    'service_id': admin.service.service_key,   
+                    'service_name': admin.service.title,      
                     'name': admin.admin_code,
                     'display_name': admin.display_label,
-                    'tax_code_id': admin.hsn_code.service_key if admin.hsn_code else None,  # if GSTCode also uses custom PK
+                    'tax_code_id': admin.hsn_code.service_key if admin.hsn_code else None, 
                     'tax_code': admin.hsn_code.code if admin.hsn_code else None,
                     'tax_percent': admin.hsn_code.percent if admin.hsn_code else None,
                     'fee_type': fee_type,
@@ -176,9 +172,8 @@ class ProviderManagementView(APIView):
                     return Response({'status': 'fail', 'message': 'Tag not found'},
                                     status=status.HTTP_404_NOT_FOUND)
 
-                # FIXED: admin → service_provider
                 has_fees = ChargeRule.objects.filter(service_provider=admin, linked_identifier=tag_id, is_deleted=False).exists()
-                if tag.is_disabled and not has_fees:  # assuming is_disabled
+                if tag.is_disabled and not has_fees:  
                     return Response({'status': 'fail', 'message': 'Cannot activate without fee setup'},
                                     status=status.HTTP_400_BAD_REQUEST)
 
@@ -187,9 +182,7 @@ class ProviderManagementView(APIView):
                 msg = 'Tag activated' if not tag.is_disabled else 'Tag deactivated'
                 return Response({'status': 'success', 'message': msg}, status=status.HTTP_200_OK)
 
-            # Main admin toggle
             if admin.is_inactive:
-                # FIXED: admin → service_provider
                 if not ChargeRule.objects.filter(service_provider=admin, is_deleted=False).exists():
                     return Response({'status': 'fail', 'message': 'Setup fees before activating'},
                                     status=status.HTTP_400_BAD_REQUEST)
@@ -211,7 +204,7 @@ class ProviderManagementView(APIView):
         try:
             admin_id = request.data.get('admin_id')
             tag_id = request.data.get('tag_id')
-            fee_type = request.data.get('fee_type')  # 'FLAT' or 'PERCENT'
+            fee_type = request.data.get('fee_type')  
             tax_id = request.data.get('tax_id')
             display_name = request.data.get('display_name')
 
@@ -234,10 +227,8 @@ class ProviderManagementView(APIView):
 
             customer_fees_json = request.data.get('fees_to_customer', '[]')
             provider_fees_json = request.data.get('fees_to_provider', '[]')
-
-            # Pass fee_type as rate_mode (FLAT/PERCENT)
-            self.sync_fees(customer_fees_json, admin, request, 'OUR_SHARE', fee_type, tag_id)       # customer → OUR_SHARE ?
-            self.sync_fees(provider_fees_json, admin, request, 'admin_SHARE', fee_type, tag_id)     # provider → admin_SHARE ?
+            self.sync_fees(customer_fees_json, admin, request, 'OUR_SHARE', fee_type, tag_id)       
+            self.sync_fees(provider_fees_json, admin, request, 'admin_SHARE', fee_type, tag_id)    
 
             return Response({
                 'status': 'success',
@@ -256,8 +247,7 @@ class ProviderManagementView(APIView):
             fees_list = json.loads(fees_json_str)
         except json.JSONDecodeError:
             raise ValueError("Invalid fee data format")
-
-        # FIXED: admin → service_provider
+        
         existing = ChargeRule.objects.filter(
             service_provider=admin,
             charge_beneficiary=category,
@@ -266,7 +256,6 @@ class ProviderManagementView(APIView):
         if tag_id:
             existing = existing.filter(linked_identifier=tag_id)
 
-        # Key based on unique logic
         existing_map = {
             (f.min_amount or Decimal('0'), f.max_amount or Decimal('0'), f.rate_mode, f.charge_type): f
             for f in existing
@@ -286,10 +275,9 @@ class ProviderManagementView(APIView):
             except (InvalidOperation, ValueError):
                 raise ValueError("Invalid number in fees")
 
-            # rate_kind → FLAT/PERCENT → maps to rate_mode
-            resolved_rate_mode = item['rate_kind'].upper()  # 'flat' → 'FLAT'
+            resolved_rate_mode = item['rate_kind'].upper()  
 
-            key = (min_val, max_val, resolved_rate_mode, 'DEBIT')  # assuming charge_type is fixed or dynamic
+            key = (min_val, max_val, resolved_rate_mode, 'DEBIT') 
             incoming_keys.add(key)
 
             existing_fee = existing_map.get(key)
@@ -301,7 +289,7 @@ class ProviderManagementView(APIView):
             elif not existing_fee:
                 ChargeRule.objects.create(
                     service_provider=admin,
-                    charge_type='DEBIT',  # or make dynamic
+                    charge_type='DEBIT',  
                     rate_mode=resolved_rate_mode,
                     min_amount=min_val if min_val != Decimal('0') else None,
                     max_amount=max_val if max_val != Decimal('0') else None,
@@ -311,7 +299,6 @@ class ProviderManagementView(APIView):
                     updated_by=request.user
                 )
 
-        # Soft delete removed ones
         for key, fee in existing_map.items():
             if key not in incoming_keys:
                 fee.is_deleted = True
