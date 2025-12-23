@@ -55,7 +55,7 @@ class AdminWalletAdjustmentView(APIView):
             return Response({
                 "status": "error",
                 "message": f"Server error: {str(e)}"
-            }, status=500)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_transaction_details(self, request):
         sp_id = request.data.get('sp_id')

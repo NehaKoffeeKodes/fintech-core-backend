@@ -74,23 +74,23 @@ class GatewayBalanceView(APIView):
                 'status': 'success',
                 'message': 'Gateway balances retrieved successfully',
                 'data': response
-            }, status=200)
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({
                 'status': 'error',
                 'message': f'Server error: {str(e)}'
-            }, status=500)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def post(self, request):
         provider_key = request.data.get("provider_name", "").strip().lower()
 
         if not provider_key:
-            return Response({"status": "error", "message": "provider_name is required"}, status=400)
+            return Response({"status": "error", "message": "provider_name is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         handler_name = self.PROVIDER_HANDLERS.get(provider_key)
         if not handler_name:
-            return Response({"status": "error", "message": f"Provider '{provider_key}' is not supported"}, status=400)
+            return Response({"status": "error", "message": f"Provider '{provider_key}' is not supported"}, status=status.HTTP_400_BAD_REQUEST)
 
         handler_method = getattr(self, handler_name)
         return handler_method(request)
@@ -197,7 +197,7 @@ class GatewayBalanceView(APIView):
         try:
             token = request.data.get('token')
             if not token:
-                return Response({"status": "error", "message": "Authentication token is required for Nobal"}, status=400)
+                return Response({"status": "error", "message": "Authentication token is required for Nobal"}, status=status.HTTP_400_BAD_REQUEST)
 
             url = "https://service.noblewebstudio.in/api/v1.0/airtel_dmt/partner_balance"
             headers = {
@@ -217,12 +217,12 @@ class GatewayBalanceView(APIView):
                     'status': 'success',
                     'message': 'Nobal balance updated',
                     'data': {'provider_name': 'Nobal', 'current_balance': balance}
-                }, status=200)
+                }, status=status.HTTP_200_OK)
 
-            return Response({"status": "error", "message": "Failed to fetch Nobal balance", "details": data}, status=400)
+            return Response({"status": "error", "message": "Failed to fetch Nobal balance", "details": data}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            return Response({'status': 'error', 'message': f'Error: {str(e)}'}, status=500)
+            return Response({'status': 'error', 'message': f'Error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def fetch_instantpay_balance(self, request):
         try:

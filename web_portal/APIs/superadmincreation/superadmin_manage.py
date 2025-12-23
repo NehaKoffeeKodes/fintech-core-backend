@@ -53,11 +53,11 @@ class SuperAdminManageView(APIView):
                 return Response({"status": "fail", "message": "Please enter a valid phone number"}, status=status.HTTP_400_BAD_REQUEST)
 
             if AdminAccount.objects.filter(email=email, is_deleted=False).exists():
-                return Response({"status": "fail", "message": "This email is already registered"}, status=409)
+                return Response({"status": "fail", "message": "This email is already registered"}, status=status.HTTP_409_CONFLICT)
             if AdminAccount.objects.filter(username=username, is_deleted=False).exists():
-                return Response({"status": "fail", "message": "This username is already taken"}, status=409)
+                return Response({"status": "fail", "message": "This username is already taken"}, status=status.HTTP_409_CONFLICT)
             if AdminAccount.objects.filter(contact_number=phone, is_deleted=False).exists():
-                return Response({"status": "fail", "message": "This phone number is already in use"}, status=409)
+                return Response({"status": "fail", "message": "This phone number is already in use"}, status=status.HTTP_409_CONFLICT)
 
             temp_pass = generate_secure_password(12)
             new_admin = AdminAccount.objects.create_superuser(
@@ -174,7 +174,7 @@ class SuperAdminManageView(APIView):
             }, status=status.HTTP_200_OK)
 
         except AdminAccount.DoesNotExist:
-            return Response({"status": "fail", "message": "SuperAdmin not found"}, status=404)
+            return Response({"status": "fail", "message": "SuperAdmin not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:
             return Response({"status": "error", "message": "Update failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -198,6 +198,6 @@ class SuperAdminManageView(APIView):
             }, status=status.HTTP_200_OK)
 
         except AdminAccount.DoesNotExist:
-            return Response({"status": "fail", "message": "SuperAdmin not found"}, status=404)
+            return Response({"status": "fail", "message": "SuperAdmin not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as exc:
             return Response({"status": "error", "message": "Deletion failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
