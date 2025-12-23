@@ -502,7 +502,6 @@ class ItemSerialView(APIView):
     authentication_classes = [SecureJWTAuthentication]
     permission_classes = [IsSuperAdmin | IsAdmin]
 
-    # =================== POST ===================
     def post(self, request):
         try:
             if 'page_number' in request.data and 'page_size' in request.data:
@@ -516,7 +515,7 @@ class ItemSerialView(APIView):
         except Exception as e:
             return Response({'status': 'error', 'message': f'Internal server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # =================== EXPORT TEMPLATE ===================
+
     def export_template(self, request):
         try:
             product_id = request.data.get('product_id')

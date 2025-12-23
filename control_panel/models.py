@@ -458,7 +458,7 @@ class ChargeRule(models.Model):
     min_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     max_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     rate_value = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    linked_identifier = models.PositiveIntegerField(null=True, blank=True, help_text="e.g., Operator ID, Biller ID")
+    linked_identifier = models.PositiveIntegerField(null=True, blank=True)
     charge_beneficiary = models.CharField(max_length=20,choices=CATEGORY_CHOICES,default='OUR_SHARE')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
@@ -564,7 +564,7 @@ class ProductItemCategory(models.Model):
 
 class ProductItem(models.Model):
     item_id = models.AutoField(primary_key=True)
-    category = models.ForeignKey(ProductItemCategory, on_delete=models.CASCADE)  # Assuming ProductCategory exists
+    category = models.ForeignKey(ProductItemCategory, on_delete=models.CASCADE) 
     manufacturer = models.CharField(max_length=255)
     item_model = models.CharField(max_length=255)
     unique_serial = models.CharField(max_length=255, null=True, blank=True)
@@ -593,17 +593,14 @@ class LimitConfig(models.Model):
     rule_id = models.AutoField(primary_key=True)
     admin = models.ForeignKey(Admin, on_delete=models.PROTECT, null=True, blank=True)
     provider = models.ForeignKey(ServiceProvider, on_delete=models.PROTECT, null=True, blank=True)
-    
     max_per_transaction = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     max_daily_total = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
     max_monthly_total = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
-    
     max_daily_transactions = models.PositiveIntegerField(null=True, blank=True)
     max_monthly_transactions = models.PositiveIntegerField(null=True, blank=True)
-    
     is_enabled = models.BooleanField(default=True)
-    valid_from = models.DateTimeField(null=True, blank=True)
-    valid_until = models.DateTimeField(null=True, blank=True)
+    valid_from = models.DateTimeField(null=True,blank=True)
+    valid_until = models.DateTimeField(null=True,blank=True)
 
     class Meta:
         db_table = 'limit_config'
@@ -616,7 +613,7 @@ class LimitConfig(models.Model):
   
 class DocumentTemplate(models.Model):
     template_id = models.AutoField(primary_key=True)
-    display_name = models.CharField(max_length=100, help_text="Name shown to user")
+    display_name = models.CharField(max_length=100)
     internal_code = models.CharField(max_length=100, unique=True, db_index=True)
     slug_key = models.SlugField(max_length=120, unique=True, db_index=True)
     mandatory = models.BooleanField(default=False)
@@ -624,10 +621,7 @@ class DocumentTemplate(models.Model):
     soft_deleted = models.BooleanField(default=False)
     added_on = models.DateTimeField(auto_now_add=True)
     modified_on = models.DateTimeField(null=True, blank=True)
-    added_by = models.ForeignKey(
-        AdminAccount, on_delete=models.SET_NULL, null=True,
-        related_name='created_templates'
-    )
+    added_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True,related_name='created_templates')
 
     class Meta:
         db_table = 'master_document_templates'
@@ -779,8 +773,7 @@ class GadgetPurchase(models.Model):
     shipping_partner = models.CharField(max_length=100, null=True, blank=True)
     status = models.CharField(max_length=20, choices=[('PENDING', 'Pending'), ('APPROVED', 'Approved'),
                                                      ('PARTIALLY APPROVED', 'Partially Approved'),
-                                                     ('REJECTED', 'Rejected'), ('CANCELLED', 'Cancelled')],
-                              default='PENDING')
+                                                     ('REJECTED', 'Rejected'), ('CANCELLED', 'Cancelled')],default='PENDING')
     expected_delivery = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
     initiated_by = models.IntegerField(blank=True, null=True)

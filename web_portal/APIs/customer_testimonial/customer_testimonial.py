@@ -77,7 +77,7 @@ class CustomerTestimonialView(APIView):
 
             if testimonial_id is not None:
                 if not str(testimonial_id).isdigit():
-                    return Response({'status': 'fail', 'message': 'Testimonial_id must be a number'}, status=400)
+                    return Response({'status': 'fail', 'message': 'Testimonial_id must be a number'}, status=status.HTTP_400_BAD_REQUEST)
                 queryset = queryset.filter(id=int(testimonial_id))
 
             if keyword:

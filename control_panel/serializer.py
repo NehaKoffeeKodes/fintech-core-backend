@@ -155,7 +155,6 @@ class AdminSerializer(serializers.ModelSerializer):
 
         return data
 
-    # Optional: exclude fields based on context
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         exclude = self.context.get('exclude_fields', [])
@@ -411,7 +410,7 @@ class AdminServiceDetailSerializer(serializers.ModelSerializer):
         service = attrs['service']
         provider = attrs['provider']
 
-        if self.instance is None:  # Only on create
+        if self.instance is None:  
             exists = AdminService.objects.filter(
                 admin=admin,
                 service=service,

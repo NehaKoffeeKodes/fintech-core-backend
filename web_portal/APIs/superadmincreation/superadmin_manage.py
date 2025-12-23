@@ -142,17 +142,17 @@ class SuperAdminManageView(APIView):
             if request.data.get("email"):
                 new_email = request.data["email"].strip().lower()
                 if new_email != admin.email and AdminAccount.objects.filter(email=new_email, is_deleted=False).exists():
-                    return Response({"status": "fail", "message": "Email already in use"}, status=409)
+                    return Response({"status": "fail", "message": "Email already in use"}, status=status.HTTP_409_CONFLICT)
 
             if request.data.get("user_name"):
                 new_username = request.data["user_name"].strip()
                 if new_username != admin.username and AdminAccount.objects.filter(username=new_username, is_deleted=False).exists():
-                    return Response({"status": "fail", "message": "Username already taken"}, status=409)
+                    return Response({"status": "fail", "message": "Username already taken"}, status=status.HTTP_409_CONFLICT)
 
             if request.data.get("contact_number"):
                 new_phone = request.data["contact_number"].strip()
                 if new_phone != admin.contact_number and AdminAccount.objects.filter(contact_number=new_phone, is_deleted=False).exists():
-                    return Response({"status": "fail", "message": "Phone number already in use"}, status=409)
+                    return Response({"status": "fail", "message": "Phone number already in use"}, status=status.HTTP_409_CONFLICT)
 
             update_map = {
                 "first_name": request.data.get("first_name"),

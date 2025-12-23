@@ -100,7 +100,7 @@ class IsRetailer(BasePermission):
                 access_token=jwt_token,
                 is_logged_out=False,
                 logout_at__isnull=True,
-                last_active_at__gte=timezone.now() - timezone.timedelta(days=7)  # 7 days active
+                last_active_at__gte=timezone.now() - timezone.timedelta(days=7) 
             ).exists()
 
             if not is_valid_session:

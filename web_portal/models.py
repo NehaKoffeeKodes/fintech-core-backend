@@ -64,7 +64,7 @@ class Superadminlogindetails(models.Model):
     class Meta:
         db_table = "superadmin_login_details"
         ordering = ['-login_time']
-        verbose_name = "Superadmin logind etails"
+        verbose_name = "Superadmin logind details"
 
     def __str__(self):
         return f"{self.user} logged in from {self.ip_address} at {self.login_time.strftime('%d %b %Y %I:%M %p')}"
@@ -185,28 +185,28 @@ class ContactSupport(models.Model):
 class ContactInfo(models.Model):
     info_id = models.AutoField(primary_key=True)
     company_name = models.CharField(max_length=200)
-    tagline = models.CharField(max_length=300, blank=True)
+    tagline = models.CharField(max_length=300,blank=True)
     support_email = models.EmailField()
     support_phone = models.CharField(max_length=15)
-    whatsapp_number = models.CharField(max_length=15, blank=True, null=True)
+    whatsapp_number = models.CharField(max_length=15,blank=True,null=True)
     address_line_1 = models.CharField(max_length=255)
-    address_line_2 = models.CharField(max_length=255, blank=True, null=True)
+    address_line_2 = models.CharField(max_length=255,blank=True,null=True)
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
     pincode = models.CharField(max_length=10)
-    gst_number = models.CharField(max_length=20, blank=True, null=True)
-    cin_number = models.CharField(max_length=30, blank=True, null=True)
-    facebook = models.URLField(blank=True, null=True)
-    instagram = models.URLField(blank=True, null=True)
-    twitter = models.URLField(blank=True, null=True)
-    linkedin = models.URLField(blank=True, null=True)
-    youtube = models.URLField(blank=True, null=True)
+    gst_number = models.CharField(max_length=20,blank=True,null=True)
+    cin_number = models.CharField(max_length=30,blank=True,null=True)
+    facebook = models.URLField(blank=True,null=True)
+    instagram = models.URLField(blank=True,null=True)
+    twitter = models.URLField(blank=True,null=True)
+    linkedin = models.URLField(blank=True,null=True)
+    youtube = models.URLField(blank=True,null=True)
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False) 
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(null=True, blank=True)
-    created_by = models.ForeignKey(AdminAccount, on_delete=models.PROTECT,related_name='contactinfo_created')
-    updated_by = models.ForeignKey(AdminAccount, on_delete=models.SET_NULL, null=True, blank=True,related_name='contactinfo_updated')
+    updated_at = models.DateTimeField(null=True,blank=True)
+    created_by = models.ForeignKey(AdminAccount,on_delete=models.PROTECT,related_name='contactinfo_created')
+    updated_by = models.ForeignKey(AdminAccount,on_delete=models.SET_NULL, null=True,blank=True,related_name='contactinfo_updated')
 
     class Meta:
         db_table = "contact_info"
