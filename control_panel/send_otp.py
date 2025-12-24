@@ -7,6 +7,8 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.conf import settings
 import json
+from rest_framework.response import Response
+from rest_framework import status
 
 
 
@@ -24,7 +26,7 @@ class SendOTPEmailAPI(View):
                 return JsonResponse({
                     "status": "fail",
                     "message": "Missing required fields"
-                }, status=400)
+                }, status=status.HTTP_400_BAD_REQUEST)
 
             msg = MIMEMultipart("alternative")
             msg["From"] = settings.DEFAULT_FROM_EMAIL
@@ -48,9 +50,9 @@ class SendOTPEmailAPI(View):
             return JsonResponse({
                 "status": "error",
                 "message": "Invalid SMTP username or password"
-            }, status=400)
+            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return JsonResponse({
                 "status": "error",
                 "message": str(e)
-            }, status=500)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

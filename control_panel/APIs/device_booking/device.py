@@ -1,4 +1,6 @@
 from ...views import*
+from rest_framework import status
+
 
 class GadgetPurchaseAPIView(APIView):
     authentication_classes = [SecureJWTAuthentication]
@@ -145,7 +147,7 @@ class GadgetPurchaseAPIView(APIView):
                     'total_records': paginator.count,
                     'records': serialized
                 }
-            }, status=200)
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
