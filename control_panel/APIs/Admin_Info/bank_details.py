@@ -48,6 +48,9 @@ class ManageDepositBanksAPIView(APIView):
             if not contains_only_letters_spaces_underscore(branch):
                 return Response({"error": True, "message": "Invalid branch name."}, status=status.HTTP_400_BAD_REQUEST)
 
+            if not contains_only_letters_spaces_underscore(holder):
+                return Response({"error": True, "message": "Invalid holder name."}, status=status.HTTP_400_BAD_REQUEST)
+
             if not contains_only_letters_spaces_underscore(acc_kind):
                 return Response({"error": True, "message": "Invalid account type."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -55,27 +58,57 @@ class ManageDepositBanksAPIView(APIView):
                 return Response({"error": True, "message": "Account number must be 8-16 digits."}, status=status.HTTP_400_BAD_REQUEST)
 
             def parse_json(field_name, value):
-                if not value:
+                if value in [None, "", {}]:
                     return None
                 try:
                     return json.loads(value) if isinstance(value, str) else value
                 except json.JSONDecodeError:
-                    raise ValueError(f"Invalid JSON in {field_name}")
+                    return Response({"error": True, "message": f"Invalid JSON format in {field_name}."}, status=status.HTTP_400_BAD_REQUEST)
 
             online_fees = parse_json("digital_transfer_fees", online_fees)
             cdm_fees = parse_json("cdm_deposit_fees", cdm_fees)
             counter_fees = parse_json("branch_counter_fees", counter_fees)
 
-            if DepositBankAccount.objects.filter(
-                ifsc_code=ifsc,
-                account_number=acc_no,
-                is_archived=False
-            ).exists():
-                return Response({"error": True, "message": "Bank with this IFSC & Account already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            def parse_enabled_channels(value):
+                if isinstance(value, dict):
+                    return {k: bool(v) for k, v in value.items()}
+                if isinstance(value, list):
+                    return {ch: True for ch in value}
+                if isinstance(value, str):
+                    try:
+                        parsed = json.loads(value)
+                        return parse_enabled_channels(parsed)
+                    except json.JSONDecodeError:
+                        raise ValueError("Invalid format for enabled_channels")
+                raise ValueError("Invalid format for enabled_channels")
+
+            try:
+                parsed_channels = parse_enabled_channels(channels)
+            except ValueError as ve:
+                return Response({"error": True, "message": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+
+            existing_ifsc = DepositBankAccount.objects.filter(ifsc_code=ifsc, is_archived=False).exists()
+            existing_acc = DepositBankAccount.objects.filter(account_number=acc_no, is_archived=False).exists()
+
+            if existing_ifsc and existing_acc:
+                return Response({
+                    "error": True,
+                    "message": "Bank account with this IFSC and Account Number already exists."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif existing_ifsc:
+                return Response({
+                    "error": True,
+                    "message": "A bank account with this IFSC code already exists."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif existing_acc:
+                return Response({
+                    "error": True,
+                    "message": "A bank account with this Account Number already exists."
+                }, status=status.HTTP_400_BAD_REQUEST)
 
             user = AdminAccount.objects.get(id=request.user.id)
             DepositBankAccount.objects.create(
-                enabled_channels=channels if isinstance(channels, list) else json.loads(channels),
+                enabled_channels=parsed_channels,
                 bank_title=bank_title,
                 ifsc_code=ifsc,
                 branch_location=branch,
@@ -83,23 +116,48 @@ class ManageDepositBanksAPIView(APIView):
                 account_number=acc_no,
                 account_kind=acc_kind,
                 digital_transfer_fees=online_fees,
-                cdm_deposit_fees=cdm_fees,   
+                cdm_deposit_fees=cdm_fees,
                 branch_counter_fees=counter_fees,
                 added_by=user
             )
-
-
-
             return Response({
                 "success": True,
                 "message": "Bank account added successfully."
             }, status=status.HTTP_201_CREATED)
 
+        except IntegrityError as e:
+            error_msg = str(e).lower()
+
+            if "ifsc_code" in error_msg or "config_deposit_banks_ifsc_code_key" in error_msg:
+                return Response({
+                    "error": True,
+                    "message": "A bank account with this IFSC code already exists."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            elif "account_number" in error_msg:
+                return Response({
+                    "error": True,
+                    "message": "A bank account with this Account Number already exists."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            elif "unique constraint" in error_msg:
+                return Response({
+                    "error": True,
+                    "message": "This bank account already exists (duplicate IFSC or Account Number)."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            else:
+                return Response({
+                    "error": True,
+                    "message": "Database error: Unable to add bank account due to constraint violation."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
         except ValueError as ve:
             return Response({"error": True, "message": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as e:
             return Response({"error": True, "message": "Server error."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+                
     def get(self, request):
         return self.list_bank_accounts(request)
 
@@ -224,7 +282,7 @@ class ManageDepositBanksAPIView(APIView):
             return Response({"error": True, "message": "Bank not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
-    def patch(self, request): 
+    def patch(self, request):
         error = enforce_required_fields(request.data, ['bank_id'])
         if error:
             return error
@@ -235,14 +293,20 @@ class ManageDepositBanksAPIView(APIView):
                 is_archived=False
             )
 
-            if len(request.data) == 1:  
-                if bank.funddepositrequest_set.filter(is_removed=False).exists():
-                    return Response({
-                        "error": True,
-                        "message": "Cannot disable bank with active fund requests."
-                    }, status=status.HTTP_400_BAD_REQUEST)
+            if 'is_enabled' in request.data:
+                new_status = bool(request.data['is_enabled'])
 
-                bank.is_enabled = not bank.is_enabled
+                if not new_status:
+                    if bank.deposit_requests.filter(is_removed=False).exists():
+                        return Response(
+                            {
+                                "error": True,
+                                "message": "Cannot disable bank with active fund requests."
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                bank.is_enabled = new_status
                 bank.modified_by = request.user
                 bank.save()
 
@@ -264,7 +328,10 @@ class ManageDepositBanksAPIView(APIView):
                 value = request.data.get(field)
                 if value is not None:
                     if not validator(str(value).strip()):
-                        return Response({"error": True, "message": f"Invalid {field.replace('_', ' ')}."}, status=status.HTTP_400_BAD_REQUEST)
+                        return Response(
+                            {"error": True, "message": f"Invalid {field.replace('_', ' ')}."},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
                     updates[field] = str(value).strip()
 
             if 'enabled_channels' in request.data:
@@ -273,11 +340,19 @@ class ManageDepositBanksAPIView(APIView):
             for charge_field in ['digital_transfer_fees', 'cdm_deposit_fees', 'branch_counter_fees']:
                 if request.data.get(charge_field) is not None:
                     try:
-                        updates[charge_field.replace('_fees', '_deposit_machine_fees') if 'cdm' in charge_field else charge_field] = (
-                            json.loads(request.data[charge_field]) if isinstance(request.data[charge_field], str) else request.data[charge_field]
+                        updates[
+                            charge_field.replace('_fees', '_deposit_machine_fees')
+                            if 'cdm' in charge_field else charge_field
+                        ] = (
+                            json.loads(request.data[charge_field])
+                            if isinstance(request.data[charge_field], str)
+                            else request.data[charge_field]
                         )
                     except json.JSONDecodeError:
-                        return Response({"error": True, "message": f"Invalid JSON in {charge_field}"}, status=status.HTTP_400_BAD_REQUEST)
+                        return Response(
+                            {"error": True, "message": f"Invalid JSON in {charge_field}"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
             for key, val in updates.items():
                 setattr(bank, key, val)
@@ -288,6 +363,9 @@ class ManageDepositBanksAPIView(APIView):
             return Response({"success": True, "message": "Bank details updated successfully."})
 
         except DepositBankAccount.DoesNotExist:
-            return Response({"error": True, "message": "Bank not found."}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"error": True, "message": "Update failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": True, "message": "Bank not found."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        except Exception:
+            return Response({"error": True, "message": "Update failed."},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
